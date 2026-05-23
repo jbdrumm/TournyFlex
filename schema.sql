@@ -12,7 +12,7 @@ create extension if not exists "uuid-ossp";
 -- ============================================================
 create table if not exists courses (
   id uuid primary key default uuid_generate_v4(),
-  name text not null,
+  name text not null unique,
   city text,
   state text,
   par integer not null default 72,
@@ -20,6 +20,9 @@ create table if not exists courses (
   course_rating numeric(4,1),
   created_at timestamptz default now()
 );
+
+-- Ensure unique index exists even if table was created without it
+create unique index if not exists courses_name_unique on courses(name);
 
 -- ============================================================
 -- COURSE HOLES (18 holes per course)
@@ -206,5 +209,3 @@ create policy "Public read round_scores" on round_scores for select using (true)
 create policy "Anon insert round_scores" on round_scores for insert with check (true);
 create policy "Anon update round_scores" on round_scores for update using (true);
 
--- Add unique constraint to courses.name for ON CONFLICT to work
-alter table courses add constraint courses_name_unique unique (name);

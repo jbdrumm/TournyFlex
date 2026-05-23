@@ -4,6 +4,9 @@
 -- Run AFTER schema.sql in your Neon SQL editor
 -- ================================================================
 
+-- Safety: ensure unique index exists before ON CONFLICT clauses
+create unique index if not exists courses_name_unique on courses(name);
+
 -- ── COURSES ──────────────────────────────────────────────────────
 INSERT INTO courses (name, city, state, par) VALUES ('El Dorado Golf Club', 'Cadillac', 'MI', 72) ON CONFLICT (name) DO NOTHING;
 INSERT INTO courses (name, city, state, par) VALUES ('Lakewood Hills Resort', 'Oscoda', 'MI', 72) ON CONFLICT (name) DO NOTHING;
