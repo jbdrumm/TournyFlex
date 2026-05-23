@@ -176,3 +176,35 @@ create policy "Anon delete scramble_teams" on scramble_teams for delete using (t
 -- ============================================================
 -- insert into courses (name, city, state, par, slope_rating, course_rating)
 -- values ('Pebble Beach Golf Links', 'Pebble Beach', 'CA', 72, 145.0, 75.5);
+
+-- ============================================================
+-- ROUND SCORES
+-- Stores individual player scores for each round.
+-- Stroke play: gross score (e.g. 88)
+-- Scramble: score relative to par (e.g. -5 = 5 under par)
+-- is_scramble=true scores are EXCLUDED from individual rankings/stats
+-- ============================================================
+create table if not exists round_scores (
+  id uuid primary key default uuid_generate_v4(),
+  event_id uuid references events(id) on delete cascade,
+  player_id uuid references players(id) on delete cascade,
+  course_id uuid references courses(id),
+  day text not null check (day in ('friday','saturday','sunday')),
+  round_time text not null check (round_time in ('morning','afternoon')),
+  is_scramble boolean not null default false,
+  score integer not null, -- gross strokes OR over/under par for scrambles
+  created_at timestamptz default now(),
+  unique(event_id, player_id, course_id, day, round_time)
+);
+
+create index if not exists idx_round_scores_event on round_scores(event_id);
+create index if not exists idx_round_scores_player on round_scores(player_id);
+create index if not exists idx_round_scores_stroke_play on round_scores(event_id, player_id) where is_scramble = false;
+
+-- Public read
+create policy "Public read round_scores" on round_scores for select using (true);
+create policy "Anon insert round_scores" on round_scores for insert with check (true);
+create policy "Anon update round_scores" on round_scores for update using (true);
+
+-- Add unique constraint to courses.name for ON CONFLICT to work
+alter table courses add constraint courses_name_unique unique (name);
