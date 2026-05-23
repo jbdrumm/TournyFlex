@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { supabase } from '../lib/supabase'
+import { db } from '../lib/db'
 import { useAuth } from '../contexts/AuthContext'
 import { sortPlayersByScore, generateScrambleTeams, calculateTotal } from '../lib/golf'
 
@@ -75,8 +75,8 @@ function EventTab() {
 
   const fetchData = async () => {
     const [{ data: evs }, { data: cs }] = await Promise.all([
-      supabase.from('events').select('*, courses(name)').order('event_date', { ascending: false }).limit(5),
-      supabase.from('courses').select('id, name').order('name')
+      db('list_events'),
+      db('list_courses')
     ])
     setEvents(evs || [])
     setCourses(cs || [])
@@ -84,20 +84,20 @@ function EventTab() {
 
   const handleSave = async () => {
     setSaving(true)
-    const { error } = await supabase.from('events').upsert(form, { onConflict: 'year' })
+    const result = await db('upsert_event', form).catch(e => ({ error: e.message }))
     setSaving(false)
-    if (error) setToast({ msg: error.message, type: 'error' })
+    if (result.error) setToast({ msg: result.error, type: 'error' })
     else { setToast({ msg: 'Event saved!', type: 'success' }); fetchData() }
     setTimeout(() => setToast(null), 3000)
   }
 
   const updateStatus = async (id, status) => {
-    await supabase.from('events').update({ status }).eq('id', id)
+    await db('update_event_status', { id, status })
     fetchData()
   }
 
   const lockScores = async (id, locked) => {
-    await supabase.from('events').update({ scores_locked: locked }).eq('id', id)
+    await db('lock_scores', { id, locked })
     fetchData()
   }
 
@@ -193,15 +193,15 @@ function PlayersTab() {
 
   const fetchData = async () => {
     const [{ data: ps }, { data: evs }] = await Promise.all([
-      supabase.from('players').select('*').order('name'),
-      supabase.from('events').select('id, year, courses(name)').order('event_date', { ascending: false }).limit(10)
+      db('list_players'),
+      db('list_events')
     ])
     setPlayers(ps || [])
     setEvents(evs || [])
   }
 
   const fetchEventPlayers = async (eid) => {
-    const { data } = await supabase.from('event_players').select('player_id').eq('event_id', eid)
+    const { data } = await db('get_event_players', { event_id: eid })
     setEventPlayers(data?.map(r => r.player_id) || [])
   }
 
@@ -213,14 +213,14 @@ function PlayersTab() {
 
   const addPlayer = async () => {
     if (!form.name.trim() || form.pin.length !== 4) return
-    const { error } = await supabase.from('players').insert({ name: form.name.trim(), pin: form.pin })
-    if (!error) { setForm({ name: '', pin: '' }); fetchData(); showToast('Player added!', 'success') }
-    else showToast(error.message, 'error')
+    const result = await db('insert_player', { name: form.name.trim(), pin: form.pin }).catch(e => ({ error: e.message }))
+    if (!result.error) { setForm({ name: '', pin: '' }); fetchData(); showToast('Player added!', 'success') }
+    else showToast(result.error, 'error')
   }
 
   const updatePin = async (playerId) => {
     if (newPin.length !== 4) return
-    await supabase.from('players').update({ pin: newPin }).eq('id', playerId)
+    await db('update_player_pin', { id: playerId, pin: newPin })
     setEditingPin(null)
     setNewPin('')
     fetchData()
@@ -231,11 +231,11 @@ function PlayersTab() {
     if (!eventId) return
     const inEvent = eventPlayers.includes(playerId)
     if (inEvent) {
-      await supabase.from('event_players').delete().eq('event_id', eventId).eq('player_id', playerId)
+      await db('toggle_event_player', { event_id: eventId, player_id: playerId, add: false })
       setEventPlayers(ep => ep.filter(id => id !== playerId))
       showToast('Removed from event', '')
     } else {
-      await supabase.from('event_players').upsert({ event_id: eventId, player_id: playerId }, { onConflict: 'event_id,player_id' })
+      await db('toggle_event_player', { event_id: eventId, player_id: playerId, add: true })
       setEventPlayers(ep => [...ep, playerId])
       showToast('Added to event ✓', 'success')
     }
@@ -359,22 +359,16 @@ function ScoresTab() {
   useEffect(() => { fetchData() }, [])
 
   const fetchData = async () => {
-    const { data: ev } = await supabase
-      .from('events')
-      .select('*, courses(par, course_holes(*))')
-      .not('status', 'eq', 'upcoming')
-      .order('event_date', { ascending: false })
-      .limit(1).single()
-
+    const { data: ev } = await db('get_event_with_holes')
     if (!ev) return
     setEvent(ev)
-    setHoles((ev.courses?.course_holes || []).sort((a, b) => a.hole_number - b.hole_number))
+    setHoles((ev.holes || []).sort((a, b) => a.hole_number - b.hole_number))
 
-    const { data: eps } = await supabase.from('event_players').select('players(id, name)').eq('event_id', ev.id)
-    const ps = eps?.map(e => e.players) || []
-    setPlayers(ps)
-
-    const { data: scs } = await supabase.from('scorecards').select('*').eq('event_id', ev.id)
+    const [{ data: eps }, { data: scs }] = await Promise.all([
+      db('get_event_players', { event_id: ev.id }),
+      db('get_scorecards', { event_id: ev.id })
+    ])
+    setPlayers(eps || [])
     const scMap = {}
     scs?.forEach(sc => { scMap[sc.player_id] = sc })
     setScorecards(scMap)
@@ -382,7 +376,9 @@ function ScoresTab() {
 
   const selectPlayer = (p) => {
     setSelectedPlayer(p)
-    setScores(scorecards[p.id]?.hole_scores || {})
+    const sc = scorecards[p.player_id]
+    const hs = sc?.hole_scores
+    setScores(hs ? (typeof hs === 'string' ? JSON.parse(hs) : hs) : {})
   }
 
   const handleSave = async () => {
@@ -392,12 +388,7 @@ function ScoresTab() {
     const total = calculateTotal(holeScores)
     const holesCompleted = Object.keys(holeScores).length
 
-    await supabase.from('scorecards').upsert({
-      event_id: event.id, player_id: selectedPlayer.id,
-      hole_scores: holeScores, total_score: total,
-      holes_completed: holesCompleted, is_complete: holesCompleted >= 18,
-      submitted_at: holesCompleted >= 18 ? new Date().toISOString() : null,
-    }, { onConflict: 'event_id,player_id' })
+    await db('upsert_scorecard', { event_id: event.id, player_id: selectedPlayer.player_id, hole_scores: holeScores, total_score: total, holes_completed: holesCompleted, is_complete: holesCompleted >= 18 })
 
     showToast(`${selectedPlayer.name} saved!`, 'success')
     fetchData()
@@ -444,11 +435,11 @@ function ScoresTab() {
       {/* Player selector */}
       <div className="card card-sm" style={{ marginBottom: 8 }}>
         <label>Select Player</label>
-        <select className="input" value={selectedPlayer?.id || ''} onChange={e => { const p = players.find(p => p.id === e.target.value); selectPlayer(p || {}) }}>
+        <select className="input" value={selectedPlayer?.id || ''} onChange={e => { const p = players.find(p => p.player_id === e.target.value); selectPlayer(p || {}) }}>
           <option value="">Choose player...</option>
           {players.map(p => (
-            <option key={p.id} value={p.id}>
-              {p.name} {scorecards[p.id]?.is_complete ? '✓' : scorecards[p.id]?.holes_completed > 0 ? `(${scorecards[p.id].holes_completed}/18)` : ''}
+            <option key={p.player_id} value={p.player_id}>
+              {p.name} {scorecards[p.player_id]?.is_complete ? '✓' : scorecards[p.player_id]?.holes_completed > 0 ? `(${scorecards[p.player_id].holes_completed}/18)` : ''}
             </option>
           ))}
         </select>
@@ -521,21 +512,20 @@ function TeamsTab() {
   useEffect(() => { fetchData() }, [])
 
   const fetchData = async () => {
-    const { data: ev } = await supabase
-      .from('events')
-      .select('*, courses(par, course_holes(hole_number, handicap_rank, par))')
-      .in('status', ['morning_complete', 'afternoon_active', 'complete'])
-      .order('event_date', { ascending: false }).limit(1).single()
-
-    if (!ev) return
+    const { data: ev } = await db('get_event_with_holes')
+    if (!ev || !['morning_complete','afternoon_active','complete'].includes(ev.status)) return
     setEvent(ev)
 
-    const { data: existing } = await supabase.from('scramble_teams').select('*').eq('event_id', ev.id).order('team_number')
+    const [{ data: existing }, { data: scs }] = await Promise.all([
+      db('get_scramble_teams', { event_id: ev.id }),
+      db('get_scorecards', { event_id: ev.id })
+    ])
+    const withScoresT = (scs || []).filter(sc => sc.is_complete).map(sc => ({ ...sc, player: { id: sc.player_id, name: sc.player_name }, hole_scores: typeof sc.hole_scores === 'string' ? JSON.parse(sc.hole_scores) : sc.hole_scores || {}, total_score: sc.total_score || 0 }))
+    const sortedT = sortPlayersByScore(withScoresT, ev.holes || [])
+    const playerMap = {}
+    sortedT.forEach(sc => { playerMap[sc.player_id] = sc })
     if (existing?.length) {
-      const { data: scs } = await supabase.from('scorecards').select('*, players(id, name)').eq('event_id', ev.id).eq('is_complete', true)
-      const playerMap = {}
-      scs?.forEach(sc => { playerMap[sc.player_id] = sc })
-      const built = existing.map(t => ({ ...t, players: t.player_ids.map(pid => playerMap[pid]).filter(Boolean) }))
+      const built = existing.map(t => ({ ...t, players: (typeof t.player_ids === 'string' ? JSON.parse(t.player_ids) : t.player_ids).map(pid => playerMap[pid]).filter(Boolean) }))
       setTeams(built)
     }
   }
@@ -544,24 +534,16 @@ function TeamsTab() {
     if (!event) return
     setGenerating(true)
 
-    const { data: scs } = await supabase.from('scorecards').select('*, players(id, name)').eq('event_id', event.id).eq('is_complete', true)
-    const courseHoles = event.courses?.course_holes || []
-    const withScores = (scs || []).map(sc => ({ ...sc, player: sc.players, total_score: sc.total_score || calculateTotal(sc.hole_scores) }))
-    const sorted = sortPlayersByScore(withScores, courseHoles)
+    const { data: scs } = await db('get_scorecards', { event_id: event.id })
+    const { data: evWithHoles } = await db('get_event_with_holes')
+    const withScores = (scs || []).filter(sc => sc.is_complete).map(sc => ({ ...sc, player: { id: sc.player_id, name: sc.player_name }, hole_scores: typeof sc.hole_scores === 'string' ? JSON.parse(sc.hole_scores) : sc.hole_scores || {}, total_score: sc.total_score || calculateTotal(sc.hole_scores || {}) }))
+    const sorted = sortPlayersByScore(withScores, evWithHoles?.holes || [])
 
     try {
       const generated = generateScrambleTeams(sorted)
 
       // Save to DB
-      await supabase.from('scramble_teams').delete().eq('event_id', event.id)
-      for (const team of generated) {
-        await supabase.from('scramble_teams').insert({
-          event_id: event.id,
-          team_number: team.team_number,
-          player_ids: team.players.map(p => p.player.id),
-          finishing_positions: team.finishing_positions,
-        })
-      }
+      await db('save_scramble_teams', { event_id: event.id, teams: generated.map(t => ({ team_number: t.team_number, player_ids: t.players.map(p => p.player.id), finishing_positions: t.finishing_positions })) })
 
       setTeams(generated)
       showToast('Teams generated and saved!', 'success')
@@ -621,7 +603,7 @@ function CoursesTab() {
   useEffect(() => { fetchCourses() }, [])
 
   const fetchCourses = async () => {
-    const { data } = await supabase.from('courses').select('*').order('name')
+    const { data } = await db('list_courses')
     setCourses(data || [])
   }
 
@@ -658,20 +640,10 @@ function CoursesTab() {
     if (!selectedCourse?.name) return
     setSaving(true)
 
-    const { data: course, error } = await supabase.from('courses').insert({
-      name: selectedCourse.name,
-      city: selectedCourse.city,
-      state: selectedCourse.state,
-      par: holes.reduce((s, h) => s + (parseInt(h.par) || 4), 0),
-      slope_rating: selectedCourse.slope_rating,
-      course_rating: selectedCourse.course_rating,
-    }).select().single()
-
-    if (error) { showToast(error.message, 'error'); setSaving(false); return }
-
-    for (const h of holes) {
-      await supabase.from('course_holes').insert({ ...h, course_id: course.id, par: parseInt(h.par), handicap_rank: parseInt(h.handicap_rank) })
-    }
+    const courseResult = await db('insert_course', { name: selectedCourse.name, city: selectedCourse.city, state: selectedCourse.state, par: holes.reduce((s, h) => s + (parseInt(h.par) || 4), 0), slope_rating: selectedCourse.slope_rating, course_rating: selectedCourse.course_rating }).catch(e => ({ error: e.message }))
+    if (courseResult.error) { showToast(courseResult.error, 'error'); setSaving(false); return }
+    const course = courseResult.data
+    await db('insert_holes', { course_id: course.id, holes: holes.map(h => ({ ...h, par: parseInt(h.par), handicap_rank: parseInt(h.handicap_rank) })) })
 
     showToast('Course saved!', 'success')
     fetchCourses()
