@@ -61,7 +61,7 @@ export default function LeaderboardPage() {
       const [holesRes, scoresRes, playersRes] = await Promise.all([
         course?.id ? db('get_course_holes', { course_id: course.id }) : Promise.resolve({ data: [] }),
         db('get_round_scores', { event_id: ev.id, day, round_time: 'morning' }),
-        db('get_event_players', { event_id: ev.id }),
+        db('get_players_for_event', { event_id: ev.id }),
       ])
 
       const courseHoles = holesRes.data || []
@@ -70,6 +70,15 @@ export default function LeaderboardPage() {
       // Build scored map
       const scoredMap = {}
       ;(scoresRes.data || []).forEach(sc => { scoredMap[sc.player_id] = sc })
+
+      // If we have scores but no event_players list, still show scores
+      const eventPlayerIds = new Set((playersRes.data || []).map(ep => ep.player_id))
+      ;(scoresRes.data || []).forEach(sc => {
+        if (!eventPlayerIds.has(sc.player_id)) {
+          playersRes.data = playersRes.data || []
+          playersRes.data.push({ player_id: sc.player_id, name: sc.player_name })
+        }
+      })
 
       // Merge all event players — scored ones get full data, unstarted get zeros
       const allPlayers = (playersRes.data || []).map(ep => {
@@ -159,7 +168,10 @@ export default function LeaderboardPage() {
       ) : standings.length === 0 ? (
         <div style={{ textAlign: 'center', padding: 48 }}>
           <p style={{ fontSize: '2rem', marginBottom: 8 }}>⛳</p>
-          <p className="text-muted text-sm">No scores yet for this round.</p>
+          <p className="text-muted text-sm" style={{ marginBottom: 8 }}>No scores yet for this round.</p>
+          <p className="text-xs text-muted" style={{ fontFamily: 'var(--font-mono)' }}>
+            {!course?.id ? '⚠️ No course assigned to this event yet.' : 'Players will appear here once assigned to this event.'}
+          </p>
         </div>
       ) : view === 'mini' ? (
         <MiniView standings={standings} par={par} currentPlayer={currentPlayer} />
@@ -192,7 +204,7 @@ function MiniView({ standings, par, currentPlayer }) {
       {standings.map((sc, idx) => {
         const isMe = currentPlayer?.id === sc.player_id
         const isFirst = idx === 0
-        const prevNotStarted = idx > 0 && !standings[idx-1].not_started && sc.not_started
+        const prevNotStarted = sc.not_started && (idx === 0 || !standings[idx-1].not_started)
 
         if (sc.not_started) {
           return (

@@ -423,6 +423,30 @@ async function handleAction(sql, action, p = {}) {
       return { data: { ok: true } }
     }
 
+
+    case 'get_players_for_event': {
+      // Try event_players first, fall back to group_players if empty
+      const fromEventPlayers = await sql`
+        SELECT ep.player_id, p.name
+        FROM event_players ep
+        JOIN players p ON p.id = ep.player_id
+        WHERE ep.event_id = ${p.event_id}
+        ORDER BY p.name`
+
+      if (fromEventPlayers.length > 0) return { data: fromEventPlayers }
+
+      // Fallback: pull unique players from groups for this event
+      const fromGroups = await sql`
+        SELECT DISTINCT gp.player_id, p.name
+        FROM group_players gp
+        JOIN event_groups eg ON eg.id = gp.group_id
+        JOIN players p ON p.id = gp.player_id
+        WHERE eg.event_id = ${p.event_id}
+        ORDER BY p.name`
+
+      return { data: fromGroups }
+    }
+
     default:
       throw new Error(`Unknown action: ${action}`)
   }

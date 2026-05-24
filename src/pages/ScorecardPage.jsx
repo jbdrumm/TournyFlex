@@ -35,7 +35,12 @@ export default function ScorecardPage() {
 
       if (course?.id) {
         const { data: h } = await db('get_course_holes', { course_id: course.id })
-        setHoles((h || []).sort((a, b) => a.hole_number - b.hole_number))
+        const loaded = (h || []).sort((a, b) => a.hole_number - b.hole_number)
+        // Use loaded holes or fall back to generic 18-hole par-4 layout
+        setHoles(loaded.length > 0 ? loaded : Array.from({length:18},(_,i)=>({hole_number:i+1,par:4,handicap_rank:i+1})))
+      } else {
+        // No course assigned — still allow score entry with generic holes
+        setHoles(Array.from({length:18},(_,i)=>({hole_number:i+1,par:4,handicap_rank:i+1})))
       }
 
       if (player) {
@@ -52,6 +57,7 @@ export default function ScorecardPage() {
   }
 
   const loadGroupScores = async (ev, members, day, courseId) => {
+    if (!ev?.id || !members?.length) return
     const newScores = {}
     await Promise.all(members.map(async m => {
       const { data: sc } = await db('get_player_round', {
@@ -187,7 +193,7 @@ export default function ScorecardPage() {
         )}
 
         {/* Hole-by-hole entry */}
-        {activeTab === 'manual' && holes.length > 0 && groupPlayers.length > 0 && (
+        {activeTab === 'manual' && groupPlayers.length > 0 && (
           <div className="card">
             {/* Hole selector */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
