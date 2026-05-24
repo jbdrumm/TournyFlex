@@ -385,3 +385,54 @@ UPDATE courses SET par = 71, slope_rating = 131, course_rating = 71.2
 -- Lakewood on Green:  ❌ No hole data — scorecard "coming soon" per website
 -- Evergreen Resort:   ❌ No hole data — bluegolf blocked
 -- ================================================================
+
+
+-- ================================================================
+-- EVERGREEN RESORT GOLF (Spruce Course) — NOW FULLY CONFIRMED
+-- Source: GolfNow screenshot
+-- Par 71 (front 35, back 36), Rating 71.2, Slope 131
+-- All pars and handicap ranks confirmed
+-- ================================================================
+UPDATE courses SET par = 71, slope_rating = 131, course_rating = 71.2
+  WHERE name = 'Evergreen Resort Golf';
+
+WITH course AS (SELECT id FROM courses WHERE name = 'Evergreen Resort Golf')
+INSERT INTO course_holes (course_id, hole_number, par, handicap_rank,
+                          yardage_white, yardage_blue)
+SELECT course.id, h.hole_number, h.par, h.handicap_rank, h.white, h.blue
+FROM course, (VALUES
+-- Hole  Par  Hdcp  White  Blue
+  (1,   4,   9,  372,  418),
+  (2,   4,   1,  400,  405),
+  (3,   3,   5,  187,  192),
+  (4,   4,   7,  384,  391),
+  (5,   3,  17,  142,  159),
+  (6,   4,   3,  388,  393),
+  (7,   4,  11,  338,  347),
+  (8,   5,  15,  465,  475),
+  (9,   4,  13,  346,  355),
+  (10,  4,  18,  347,  376),
+  (11,  4,  14,  353,  359),
+  (12,  4,  10,  361,  384),
+  (13,  3,  16,  136,  174),
+  (14,  4,   2,  420,  450),
+  (15,  5,   8,  447,  504),
+  (16,  4,   4,  410,  420),
+  (17,  5,   6,  457,  467),
+  (18,  3,  12,  141,  169)
+) AS h(hole_number, par, handicap_rank, white, blue)
+ON CONFLICT (course_id, hole_number) DO UPDATE SET
+  par = EXCLUDED.par, handicap_rank = EXCLUDED.handicap_rank,
+  yardage_white = EXCLUDED.yardage_white, yardage_blue = EXCLUDED.yardage_blue;
+
+-- ================================================================
+-- FINAL DATA QUALITY SUMMARY
+-- El Dorado:          ✅ ALL 18 confirmed (official website)
+-- Manistee Revenge:   ✅ ALL 18 confirmed (scorecard image)
+-- Manistee Retreat:   ✅ ALL 18 confirmed (scorecard image)
+-- Stonegate:          ✅ ALL 18 confirmed (scorecard image)
+-- Hemlock:            ✅ ALL 18 confirmed (scorecard image)
+-- Emerald Vale:       ✅ ALL 18 confirmed (scorecard image)
+-- Evergreen Resort:   ✅ ALL 18 confirmed (GolfNow screenshot)
+-- Lakewood on Green:  ❌ No hole data — scorecard "coming soon" per website
+-- ================================================================
