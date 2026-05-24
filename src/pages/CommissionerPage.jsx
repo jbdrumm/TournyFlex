@@ -74,7 +74,8 @@ function EventTab() {
     saturday_afternoon_tee_time: '',
     sunday_course_id: '',
     sunday_tee_time: '',
-    multiple_courses: false,   // enables separate AM/PM course selectors
+    friday_split: false,     // separate AM/PM courses on Friday
+    saturday_split: false,   // separate AM/PM courses on Saturday
   }
 
   useEffect(() => { fetchData() }, [])
@@ -94,7 +95,7 @@ function EventTab() {
     setForm({
       ...EMPTY_FORM,
       year: ev.year,
-      event_date: ev.event_date || '',
+      event_date: ev.event_date ? String(ev.event_date).split('T')[0] : '',
       status: ev.status || 'upcoming',
       player_count: ev.player_count || 20,
       friday_course_id: ev.friday_course_id || '',
@@ -105,7 +106,8 @@ function EventTab() {
       saturday_afternoon_tee_time: ev.saturday_afternoon_tee_time || '',
       sunday_course_id: ev.sunday_course_id || '',
       sunday_tee_time: ev.sunday_tee_time || '',
-      multiple_courses: false,
+      friday_split: false,
+      saturday_split: false,
     })
   }
 
@@ -239,30 +241,20 @@ function EventTab() {
             </select>
           </div>
 
-          {/* Multiple courses toggle */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, padding: '10px 12px', background: 'var(--green-deep)', borderRadius: 'var(--radius)' }}>
-            <button onClick={() => set('multiple_courses', !form.multiple_courses)}
-              style={{
-                width: 20, height: 20, borderRadius: 3, flexShrink: 0,
-                background: form.multiple_courses ? 'var(--gold)' : 'transparent',
-                border: `2px solid ${form.multiple_courses ? 'var(--gold)' : 'var(--green-mid)'}`,
-                cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: '0.7rem', color: 'var(--green-deep)',
-              }}>
-              {form.multiple_courses ? '✓' : ''}
-            </button>
-            <div>
-              <div style={{ fontSize: '0.85rem', fontWeight: 500 }}>Multiple Courses</div>
-              <div className="text-xs text-muted">Separate AM and PM course per day (e.g. Manistee Retreat AM / Revenge PM)</div>
-            </div>
-          </div>
+
 
           {/* Course Assignments */}
           <div>
             {/* FRIDAY */}
             <div style={{ marginBottom: 14, background: 'var(--green-deep)', borderRadius: 'var(--radius)', padding: 12 }}>
-              <p className="text-xs text-muted text-mono" style={{ marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Friday</p>
-              {form.multiple_courses ? (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                <p className="text-xs text-muted text-mono" style={{ textTransform: 'uppercase', letterSpacing: '0.05em' }}>Friday</p>
+                <button onClick={() => set('friday_split', !form.friday_split)} style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+                  <div style={{ width: 16, height: 16, borderRadius: 3, background: form.friday_split ? 'var(--gold)' : 'transparent', border: `2px solid ${form.friday_split ? 'var(--gold)' : 'var(--green-mid)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.6rem', color: 'var(--green-deep)', flexShrink: 0 }}>{form.friday_split ? '✓' : ''}</div>
+                  <span className="text-xs text-muted">Split AM/PM</span>
+                </button>
+              </div>
+              {form.friday_split ? (
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                   <CourseSelect label="AM Course" field="friday_course_id" />
                   <TimeInput label="AM Tee Time" field="friday_tee_time" />
@@ -281,8 +273,14 @@ function EventTab() {
 
             {/* SATURDAY */}
             <div style={{ marginBottom: 14, background: 'var(--green-deep)', borderRadius: 'var(--radius)', padding: 12 }}>
-              <p className="text-xs text-muted text-mono" style={{ marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Saturday</p>
-              {form.multiple_courses ? (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                <p className="text-xs text-muted text-mono" style={{ textTransform: 'uppercase', letterSpacing: '0.05em' }}>Saturday</p>
+                <button onClick={() => set('saturday_split', !form.saturday_split)} style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+                  <div style={{ width: 16, height: 16, borderRadius: 3, background: form.saturday_split ? 'var(--gold)' : 'transparent', border: `2px solid ${form.saturday_split ? 'var(--gold)' : 'var(--green-mid)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.6rem', color: 'var(--green-deep)', flexShrink: 0 }}>{form.saturday_split ? '✓' : ''}</div>
+                  <span className="text-xs text-muted">Split AM/PM</span>
+                </button>
+              </div>
+              {form.saturday_split ? (
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                   <CourseSelect label="AM Course" field="saturday_course_id" />
                   <TimeInput label="AM Tee Time" field="saturday_tee_time" />
@@ -434,59 +432,154 @@ function PlayersTab() {
 
 // ─── SCORES TAB ───────────────────────────────────────────────────────────────
 function ScoresTab() {
-  const ROUNDS_STROKE = [
-    { key: 'friday_morning',   day: 'friday',   rt: 'morning',   label: 'Friday AM' },
-    { key: 'saturday_morning', day: 'saturday', rt: 'morning',   label: 'Saturday AM' },
+  const ALL_ROUNDS = [
+    { key: 'friday_morning',    day: 'friday',   rt: 'morning',   label: 'Fri AM Singles',  is_scramble: false },
+    { key: 'friday_afternoon',  day: 'friday',   rt: 'afternoon', label: 'Fri PM Scramble', is_scramble: true  },
+    { key: 'saturday_morning',  day: 'saturday', rt: 'morning',   label: 'Sat AM Singles',  is_scramble: false },
+    { key: 'saturday_afternoon',day: 'saturday', rt: 'afternoon', label: 'Sat PM Scramble', is_scramble: true  },
+    { key: 'sunday_morning',    day: 'sunday',   rt: 'morning',   label: 'Sun Scramble',    is_scramble: true  },
   ]
+
   const [event, setEvent] = useState(null)
-  const [players, setPlayers] = useState([])
-  const [holes, setHoles] = useState([])
-  const [selectedPlayer, setSelectedPlayer] = useState(null)
   const [selectedRound, setSelectedRound] = useState('friday_morning')
-  const [scores, setScores] = useState({})
+  const [groups, setGroups] = useState([])       // morning groups for stroke play rounds
+  const [scrambleTeams, setScrambleTeams] = useState([]) // for scramble rounds
+  const [selectedGroupId, setSelectedGroupId] = useState(null)
+  const [groupMembers, setGroupMembers] = useState([])   // [{ player_id, name }]
+  const [holes, setHoles] = useState([])
+  const [currentHole, setCurrentHole] = useState(1)
+  const [scores, setScores] = useState({})        // { playerId: { "1": 4, "2": 5 } }
+  const [scrambleScore, setScrambleScore] = useState('')
+  const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [toast, setToast] = useState(null)
   const fileRef = useRef()
 
-  useEffect(() => { fetchData() }, [])
-  useEffect(() => { if (event) loadHoles(event) }, [selectedRound, event])
+  useEffect(() => { fetchEvent() }, [])
+  useEffect(() => { if (event) fetchRoundData() }, [selectedRound, event])
 
-  const fetchData = async () => {
+  const fetchEvent = async () => {
     const { data: ev } = await db('get_current_event')
-    if (!ev) return
     setEvent(ev)
-    const { data: eps } = await db('get_event_players', { event_id: ev.id })
-    setPlayers(eps || [])
   }
 
-  const loadHoles = async (ev) => {
-    const def = ROUNDS_STROKE.find(r => r.key === selectedRound)
-    const course = getCourseForRound(ev, def?.day)
+  const fetchRoundData = async () => {
+    if (!event) return
+    const def = ALL_ROUNDS.find(r => r.key === selectedRound)
+    setSelectedGroupId(null)
+    setGroupMembers([])
+    setScores({})
+    setCurrentHole(1)
+
+    // Load holes for the course
+    const course = getCourseForRound(event, def.day)
     if (course?.id) {
       const { data: h } = await db('get_course_holes', { course_id: course.id })
       setHoles((h || []).sort((a, b) => a.hole_number - b.hole_number))
+    } else {
+      setHoles([])
+    }
+
+    if (!def.is_scramble) {
+      // Load morning groups for group-based entry
+      const { data: g } = await db('get_groups', { event_id: event.id, day: def.day })
+      setGroups(g || [])
+      setScrambleTeams([])
+    } else {
+      // Load scramble teams
+      const { data: t } = await db('get_scramble_teams', { event_id: event.id, round: selectedRound })
+      setScrambleTeams(t || [])
+      setGroups([])
     }
   }
 
-  const selectPlayer = async (p) => {
-    setSelectedPlayer(p); setScores({})
-    const def = ROUNDS_STROKE.find(r => r.key === selectedRound)
-    if (!event || !def || !p) return
+  const selectGroup = async (group) => {
+    setSelectedGroupId(group.id || group.group_number)
+    const members = group.players || []
+    setGroupMembers(members)
+    setCurrentHole(1)
+
+    // Load existing scores for all members
+    const def = ALL_ROUNDS.find(r => r.key === selectedRound)
     const course = getCourseForRound(event, def.day)
     if (!course?.id) return
-    const { data: sc } = await db('get_player_round', { event_id: event.id, player_id: p.player_id, day: def.day, round_time: def.rt })
-    if (sc?.hole_scores) setScores(typeof sc.hole_scores === 'string' ? JSON.parse(sc.hole_scores) : sc.hole_scores)
+    const newScores = {}
+    await Promise.all(members.map(async m => {
+      const pid = m.player_id
+      const { data: sc } = await db('get_player_round', {
+        event_id: event.id, player_id: pid, day: def.day, round_time: def.rt
+      })
+      newScores[pid] = sc?.hole_scores
+        ? (typeof sc.hole_scores === 'string' ? JSON.parse(sc.hole_scores) : sc.hole_scores)
+        : {}
+    }))
+    setScores(newScores)
   }
 
-  const save = async () => {
-    if (!selectedPlayer || !event) return
-    const def = ROUNDS_STROKE.find(r => r.key === selectedRound)
+  const selectTeam = async (team) => {
+    const pids = typeof team.player_ids === 'string' ? JSON.parse(team.player_ids) : team.player_ids
+    const def = ALL_ROUNDS.find(r => r.key === selectedRound)
+    // Get player names from round scores if available
+    const { data: allScores } = await db('get_round_scores', { event_id: event.id, day: def.day, round_time: def.rt })
+    const playerMap = {}
+    allScores?.forEach(s => { playerMap[s.player_id] = s.player_name })
+    const members = pids.map(pid => ({ player_id: pid, name: playerMap[pid] || pid }))
+    setGroupMembers(members)
+    setSelectedGroupId(team.id || team.team_number)
+    // Load existing scramble score
+    if (members[0]) {
+      const { data: sc } = await db('get_player_round', {
+        event_id: event.id, player_id: members[0].player_id, day: def.day, round_time: def.rt
+      })
+      if (sc?.total_score) setScrambleScore(String(sc.total_score))
+    }
+  }
+
+  const setScore = (playerId, holeNum, value) => {
+    setScores(s => ({ ...s, [playerId]: { ...s[playerId], [String(holeNum)]: value } }))
+  }
+
+  const adjustScore = (playerId, holeNum, delta) => {
+    const current = scores[playerId]?.[String(holeNum)] ?? 4
+    const next = Math.max(1, Math.min(15, current + delta))
+    setScore(playerId, holeNum, next)
+  }
+
+  const saveAll = async () => {
+    if (!event || groupMembers.length === 0) return
+    setSaving(true)
+    const def = ALL_ROUNDS.find(r => r.key === selectedRound)
     const course = getCourseForRound(event, def.day)
-    const holeScores = {}
-    Object.entries(scores).forEach(([k, v]) => { if (v) holeScores[k] = parseInt(v) })
-    const total = calculateTotal(holeScores)
-    await db('upsert_round_score', { event_id: event.id, player_id: selectedPlayer.player_id, course_id: course?.id, day: def.day, round_time: def.rt, is_scramble: false, hole_scores: holeScores, total_score: total, holes_completed: Object.keys(holeScores).length, is_complete: Object.keys(holeScores).length >= 18 })
-    showToast(`${selectedPlayer.name} saved!`, 'success')
+
+    if (def.is_scramble) {
+      // Scramble: one score for all players
+      const score = parseInt(scrambleScore)
+      if (!isNaN(score)) {
+        await db('save_scramble_score', {
+          event_id: event.id, course_id: course?.id,
+          day: def.day, round_time: def.rt,
+          player_ids: groupMembers.map(m => m.player_id),
+          score,
+        })
+        showToast('Scramble score saved!', 'success')
+      }
+    } else {
+      // Stroke play: save each player's hole scores
+      for (const member of groupMembers) {
+        const holeScores = {}
+        Object.entries(scores[member.player_id] || {}).forEach(([k, v]) => { if (v) holeScores[k] = parseInt(v) })
+        const total = Object.values(holeScores).reduce((a, v) => a + v, 0)
+        const holesCompleted = Object.keys(holeScores).length
+        await db('upsert_round_score', {
+          event_id: event.id, player_id: member.player_id, course_id: course?.id,
+          day: def.day, round_time: def.rt, is_scramble: false,
+          hole_scores: holeScores, total_score: total,
+          holes_completed: holesCompleted, is_complete: holesCompleted >= 18,
+        })
+      }
+      showToast(`Saved ${groupMembers.length} scorecards!`, 'success')
+    }
+    setSaving(false)
   }
 
   const handlePhoto = async (e) => {
@@ -494,84 +587,286 @@ function ScoresTab() {
     if (!file) return
     setUploading(true)
     showToast('Analyzing with AI...', '')
-    const base64 = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result.split(',')[1]); r.onerror = rej; r.readAsDataURL(file) })
+    const base64 = await new Promise((res, rej) => {
+      const r = new FileReader(); r.onload = () => res(r.result.split(',')[1]); r.onerror = rej; r.readAsDataURL(file)
+    })
     try {
-      const res = await fetch('/.netlify/functions/parse-scorecard', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ image: base64, mediaType: file.type, holeCount: 18 }) })
+      const res = await fetch('/.netlify/functions/parse-scorecard', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: base64, mediaType: file.type, holeCount: 18, multiPlayer: true })
+      })
       const data = await res.json()
-      if (data.scores) {
-        const parsed = {}
-        data.scores.forEach((s, i) => { if (s) parsed[String(i + 1)] = s })
-        setScores(parsed)
-        showToast(`Parsed ${Object.keys(parsed).length} holes — review & save`, 'success')
-      } else showToast('Could not parse.', 'error')
+      // data.players = [{ name, scores: [4,5,...] }] or data.scores for single player
+      if (data.players?.length) {
+        const newScores = { ...scores }
+        data.players.forEach((parsed, idx) => {
+          if (groupMembers[idx] && parsed.scores) {
+            const holeScores = {}
+            parsed.scores.forEach((s, i) => { if (s) holeScores[String(i + 1)] = s })
+            newScores[groupMembers[idx].player_id] = holeScores
+          }
+        })
+        setScores(newScores)
+        showToast(`Parsed ${data.players.length} players — review & save`, 'success')
+      } else if (data.scores) {
+        // Single player fallback — apply to first unscored member or active
+        const target = groupMembers[0]
+        if (target) {
+          const holeScores = {}
+          data.scores.forEach((s, i) => { if (s) holeScores[String(i + 1)] = s })
+          setScores(s => ({ ...s, [target.player_id]: holeScores }))
+          showToast(`Parsed scores for ${target.name} — review & save`, 'success')
+        }
+      } else {
+        showToast('Could not parse. Enter manually.', 'error')
+      }
     } catch { showToast('Upload failed.', 'error') }
     setUploading(false)
   }
 
   const showToast = (msg, type) => { setToast({ msg, type }); setTimeout(() => setToast(null), 3000) }
-  const total = calculateTotal(Object.fromEntries(Object.entries(scores).filter(([, v]) => v)))
-  const def = ROUNDS_STROKE.find(r => r.key === selectedRound)
+
+  const def = ALL_ROUNDS.find(r => r.key === selectedRound)
   const course = event && def ? getCourseForRound(event, def.day) : null
+  const currentHoleData = holes.find(h => h.hole_number === currentHole)
+  const holePar = currentHoleData?.par || 4
 
   return (
     <div>
-      {/* Round selector */}
-      <div style={{ display: 'flex', gap: 4, marginBottom: 12 }}>
-        {ROUNDS_STROKE.map(r => (
-          <button key={r.key} onClick={() => { setSelectedRound(r.key); setScores({}); setSelectedPlayer(null) }}
-            style={{ flex: 1, padding: '8px', border: 'none', borderRadius: 'var(--radius)', background: selectedRound === r.key ? 'var(--gold)' : 'var(--green-dark)', color: selectedRound === r.key ? 'var(--green-deep)' : 'var(--gray-300)', fontFamily: 'var(--font-body)', fontSize: '0.8rem', fontWeight: selectedRound === r.key ? 600 : 400, cursor: 'pointer' }}>
-            {r.label}{course ? ` — ${course.name}` : ''}
-          </button>
+      {/* Round selector — 2 rows x 3 cols matching Groups layout */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4, marginBottom: 12 }}>
+        {ALL_ROUNDS.slice(0, 3).map(r => (
+          <button key={r.key} onClick={() => setSelectedRound(r.key)} style={{
+            padding: '9px 4px', border: 'none', borderRadius: 'var(--radius)',
+            background: selectedRound === r.key ? 'var(--gold)' : 'var(--green-deep)',
+            color: selectedRound === r.key ? 'var(--green-deep)' : 'var(--gray-300)',
+            fontFamily: 'var(--font-body)', fontSize: '0.7rem',
+            fontWeight: selectedRound === r.key ? 600 : 400, cursor: 'pointer', textAlign: 'center', lineHeight: 1.3,
+          }}>{r.label}</button>
         ))}
+        {ALL_ROUNDS.slice(3, 5).map(r => (
+          <button key={r.key} onClick={() => setSelectedRound(r.key)} style={{
+            padding: '9px 4px', border: 'none', borderRadius: 'var(--radius)',
+            background: selectedRound === r.key ? 'var(--gold)' : 'var(--green-deep)',
+            color: selectedRound === r.key ? 'var(--green-deep)' : 'var(--gray-300)',
+            fontFamily: 'var(--font-body)', fontSize: '0.7rem',
+            fontWeight: selectedRound === r.key ? 600 : 400, cursor: 'pointer', textAlign: 'center', lineHeight: 1.3,
+          }}>{r.label}</button>
+        ))}
+        <div /> {/* blank cell */}
       </div>
 
-      <div className="card card-sm" style={{ marginBottom: 8 }}>
-        <label>Select Player</label>
-        <select className="input" value={selectedPlayer?.player_id || ''} onChange={e => { const p = players.find(p => p.player_id === e.target.value); selectPlayer(p || null) }}>
-          <option value="">Choose player...</option>
-          {players.map(p => <option key={p.player_id} value={p.player_id}>{p.name}</option>)}
-        </select>
-      </div>
-
-      {selectedPlayer && (
-        <>
-          <div className="card card-sm flex gap-2 items-center" style={{ marginBottom: 8 }}>
-            <span className="text-sm flex-1">Upload scorecard photo for AI parsing</span>
-            <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handlePhoto} />
-            <button className="btn btn-secondary btn-sm" onClick={() => fileRef.current?.click()} disabled={uploading}>{uploading ? '...' : '📸'}</button>
-          </div>
-          {holes.length > 0 && (
-            <div className="card">
-              {[holes.slice(0, 9), holes.slice(9, 18)].map((nine, ni) => (
-                <div key={ni}>
-                  <p className="text-xs text-muted text-mono" style={{ marginBottom: 8, textTransform: 'uppercase' }}>{ni === 0 ? 'Front Nine' : 'Back Nine'}</p>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(9, 1fr)', gap: 4, marginBottom: ni === 0 ? 12 : 16 }}>
-                    {nine.map(h => (
-                      <div key={h.hole_number} className="hole-input-wrap">
-                        <span className="hole-num">{h.hole_number}</span>
-                        <input type="number" min="1" max="15" className="hole-input"
-                          value={scores[String(h.hole_number)] || ''}
-                          onChange={e => setScores(s => ({ ...s, [String(h.hole_number)]: e.target.value }))} />
-                        <span style={{ fontSize: '0.55rem', color: 'var(--gray-500)' }}>p{h.par}</span>
-                      </div>
-                    ))}
-                  </div>
-                  {ni === 0 && <hr className="divider" />}
-                </div>
-              ))}
-              <div className="flex justify-between items-center" style={{ marginBottom: 12 }}>
-                <span>Total: <strong className="text-mono" style={{ fontSize: '1.2rem' }}>{total || '–'}</strong></span>
-                {total && course?.par && <span className="text-mono" style={{ color: total - course.par > 0 ? 'var(--red)' : total - course.par < 0 ? 'var(--blue-birdie)' : 'var(--cream)' }}>{total - course.par === 0 ? 'E' : total - course.par > 0 ? `+${total - course.par}` : total - course.par}</span>}
-              </div>
-              <button className="btn btn-primary btn-full" onClick={save} disabled={!total}>Save Scores</button>
-            </div>
-          )}
-        </>
+      {/* Course info */}
+      {course?.name && (
+        <p className="text-xs text-muted text-mono" style={{ marginBottom: 10 }}>
+          {course.name} · Par {course.par}
+        </p>
       )}
+
+      {/* Group / Team selector */}
+      {!def?.is_scramble && groups.length > 0 && (
+        <div style={{ marginBottom: 12 }}>
+          <label style={{ display: 'block', marginBottom: 6, fontSize: '0.75rem', color: 'var(--gray-300)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            Select Group
+          </label>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(72px, 1fr))', gap: 6 }}>
+            {groups.map(g => (
+              <button key={g.group_number} onClick={() => selectGroup(g)} style={{
+                padding: '8px 4px', border: 'none', borderRadius: 'var(--radius)',
+                background: selectedGroupId === (g.id || g.group_number) ? 'var(--gold)' : 'var(--green-dark)',
+                color: selectedGroupId === (g.id || g.group_number) ? 'var(--green-deep)' : 'var(--cream)',
+                fontFamily: 'var(--font-body)', fontSize: '0.8rem', fontWeight: 500, cursor: 'pointer', textAlign: 'center',
+              }}>
+                Group {g.group_number}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {def?.is_scramble && scrambleTeams.length > 0 && (
+        <div style={{ marginBottom: 12 }}>
+          <label style={{ display: 'block', marginBottom: 6, fontSize: '0.75rem', color: 'var(--gray-300)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            Select Team
+          </label>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(72px, 1fr))', gap: 6 }}>
+            {scrambleTeams.map(t => (
+              <button key={t.team_number} onClick={() => selectTeam(t)} style={{
+                padding: '8px 4px', border: 'none', borderRadius: 'var(--radius)',
+                background: selectedGroupId === (t.id || t.team_number) ? 'var(--gold)' : 'var(--green-dark)',
+                color: selectedGroupId === (t.id || t.team_number) ? 'var(--green-deep)' : 'var(--cream)',
+                fontFamily: 'var(--font-body)', fontSize: '0.8rem', fontWeight: 500, cursor: 'pointer', textAlign: 'center',
+              }}>
+                Team {t.team_number}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Group members verification */}
+      {groupMembers.length > 0 && (
+        <div className="card card-sm" style={{ marginBottom: 12, borderColor: 'rgba(201,168,76,0.3)' }}>
+          <p className="text-xs" style={{ color: 'var(--gold)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', marginBottom: 6 }}>
+            {def?.is_scramble ? 'Team Members' : 'Group Members'} — verify names match scorecard
+          </p>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {groupMembers.map(m => (
+              <span key={m.player_id} style={{ background: 'var(--green-mid)', padding: '4px 10px', borderRadius: 100, fontSize: '0.8rem', fontWeight: 500 }}>
+                {m.name}
+              </span>
+            ))}
+          </div>
+          {!def?.is_scramble && (
+            <p className="text-xs text-muted" style={{ marginTop: 8 }}>
+              Photo scorecard should show these players. Names must match system names for accurate record-keeping.
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Photo upload */}
+      {groupMembers.length > 0 && (
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12 }}>
+          <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handlePhoto} />
+          <button className="btn btn-secondary btn-full" onClick={() => fileRef.current?.click()} disabled={uploading}>
+            {uploading ? '⏳ Analyzing...' : '📸 Upload Scorecard Photo'}
+          </button>
+        </div>
+      )}
+
+      {/* ── SCRAMBLE score entry ───────────────────────────────── */}
+      {def?.is_scramble && groupMembers.length > 0 && (
+        <div className="card" style={{ marginBottom: 12 }}>
+          <p className="text-xs text-muted text-mono" style={{ marginBottom: 12, textTransform: 'uppercase' }}>Team Score</p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            <div>
+              <label style={{ display: 'block', marginBottom: 4 }}>Score vs Par</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <button onClick={() => setScrambleScore(s => String((parseInt(s)||0) - 1))}
+                  style={{ width: 36, height: 36, border: '1px solid var(--green-mid)', borderRadius: 'var(--radius)', background: 'var(--green-deep)', color: 'var(--cream)', fontSize: '1.2rem', cursor: 'pointer' }}>−</button>
+                <span className="text-mono" style={{ fontSize: '1.4rem', fontWeight: 700, minWidth: 48, textAlign: 'center',
+                  color: parseInt(scrambleScore) < 0 ? 'var(--blue-birdie)' : parseInt(scrambleScore) > 0 ? 'var(--red)' : 'var(--cream)' }}>
+                  {scrambleScore === '' ? '–' : parseInt(scrambleScore) > 0 ? `+${scrambleScore}` : scrambleScore}
+                </span>
+                <button onClick={() => setScrambleScore(s => String((parseInt(s)||0) + 1))}
+                  style={{ width: 36, height: 36, border: '1px solid var(--green-mid)', borderRadius: 'var(--radius)', background: 'var(--green-deep)', color: 'var(--cream)', fontSize: '1.2rem', cursor: 'pointer' }}>+</button>
+              </div>
+            </div>
+          </div>
+          <button className="btn btn-primary btn-full" style={{ marginTop: 16 }} onClick={saveAll} disabled={saving || scrambleScore === ''}>
+            {saving ? 'Saving...' : 'Save Team Score'}
+          </button>
+        </div>
+      )}
+
+      {/* ── STROKE PLAY hole-by-hole entry ────────────────────── */}
+      {!def?.is_scramble && groupMembers.length > 0 && holes.length > 0 && (
+        <div className="card">
+          {/* Hole selector */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+            <button onClick={() => setCurrentHole(h => Math.max(1, h - 1))} disabled={currentHole === 1}
+              style={{ width: 40, height: 40, border: '1px solid var(--green-mid)', borderRadius: 'var(--radius)', background: 'var(--green-deep)', color: 'var(--cream)', fontSize: '1.2rem', cursor: 'pointer' }}>
+              ‹
+            </button>
+            <div style={{ textAlign: 'center' }}>
+              <p style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', fontWeight: 700, lineHeight: 1 }}>
+                Hole {currentHole}
+              </p>
+              <p className="text-xs text-muted text-mono" style={{ marginTop: 2 }}>
+                Par {holePar} · Hdcp #{currentHoleData?.handicap_rank || '–'}
+              </p>
+            </div>
+            <button onClick={() => setCurrentHole(h => Math.min(18, h + 1))} disabled={currentHole === 18}
+              style={{ width: 40, height: 40, border: '1px solid var(--green-mid)', borderRadius: 'var(--radius)', background: 'var(--green-deep)', color: 'var(--cream)', fontSize: '1.2rem', cursor: 'pointer' }}>
+              ›
+            </button>
+          </div>
+
+          {/* Hole progress dots */}
+          <div style={{ display: 'flex', gap: 3, justifyContent: 'center', marginBottom: 16, flexWrap: 'wrap' }}>
+            {holes.map(h => {
+              const anyScore = groupMembers.some(m => scores[m.player_id]?.[String(h.hole_number)])
+              return (
+                <button key={h.hole_number} onClick={() => setCurrentHole(h.hole_number)}
+                  style={{
+                    width: 20, height: 20, borderRadius: '50%', border: 'none',
+                    background: h.hole_number === currentHole ? 'var(--gold)'
+                      : anyScore ? 'var(--green-light)' : 'var(--green-mid)',
+                    cursor: 'pointer', fontSize: '0.6rem', fontFamily: 'var(--font-mono)',
+                    color: h.hole_number === currentHole ? 'var(--green-deep)' : 'var(--cream)',
+                    fontWeight: h.hole_number === currentHole ? 700 : 400,
+                  }}>
+                  {h.hole_number}
+                </button>
+              )
+            })}
+          </div>
+
+          <hr className="divider" style={{ marginBottom: 12 }} />
+
+          {/* Per-player score entry for current hole */}
+          {groupMembers.map(member => {
+            const holeScore = scores[member.player_id]?.[String(currentHole)] ?? 4
+            const diff = holeScore - holePar
+            const diffTxt = diff === 0 ? 'E' : diff > 0 ? `+${diff}` : `${diff}`
+            const diffColor = diff < 0 ? 'var(--blue-birdie)' : diff > 0 ? 'var(--red)' : 'var(--gray-500)'
+            const playerTotal = Object.values(scores[member.player_id] || {}).reduce((a, v) => a + (parseInt(v) || 0), 0)
+            const playerHoles = Object.keys(scores[member.player_id] || {}).filter(k => scores[member.player_id][k]).length
+
+            return (
+              <div key={member.player_id} style={{
+                display: 'grid', gridTemplateColumns: '1fr auto auto auto',
+                alignItems: 'center', gap: 8, padding: '10px 0',
+                borderBottom: '1px solid var(--green-mid)',
+              }}>
+                {/* Name + totals */}
+                <div>
+                  <span style={{ fontWeight: 500, fontSize: '0.9rem' }}>{member.name}</span>
+                  {playerHoles > 0 && (
+                    <span className="text-xs text-muted text-mono" style={{ marginLeft: 8 }}>
+                      {playerTotal} ({playerHoles}/18)
+                    </span>
+                  )}
+                </div>
+
+                {/* Score stepper */}
+                <button onClick={() => adjustScore(member.player_id, currentHole, -1)}
+                  style={{ width: 32, height: 32, border: '1px solid var(--green-mid)', borderRadius: 'var(--radius)', background: 'var(--green-deep)', color: 'var(--cream)', fontSize: '1rem', cursor: 'pointer', flexShrink: 0 }}>
+                  −
+                </button>
+                <span className="text-mono" style={{ fontSize: '1.4rem', fontWeight: 700, minWidth: 24, textAlign: 'center' }}>
+                  {holeScore}
+                </span>
+                <button onClick={() => adjustScore(member.player_id, currentHole, 1)}
+                  style={{ width: 32, height: 32, border: '1px solid var(--green-mid)', borderRadius: 'var(--radius)', background: 'var(--green-deep)', color: 'var(--cream)', fontSize: '1rem', cursor: 'pointer', flexShrink: 0 }}>
+                  +
+                </button>
+              </div>
+            )
+          })}
+
+          <hr className="divider" style={{ marginTop: 4, marginBottom: 12 }} />
+
+          {/* Action row */}
+          <div style={{ display: 'flex', gap: 8 }}>
+            {currentHole < 18 && (
+              <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setCurrentHole(h => h + 1)}>
+                Next Hole →
+              </button>
+            )}
+            <button className="btn btn-primary" style={{ flex: 1 }} onClick={saveAll} disabled={saving}>
+              {saving ? 'Saving...' : 'Save All'}
+            </button>
+          </div>
+        </div>
+      )}
+
       {toast && <div className={`toast ${toast.type}`}>{toast.msg}</div>}
     </div>
   )
 }
+
 
 // ─── TEAMS TAB ────────────────────────────────────────────────────────────────
 function TeamsTab() {

@@ -47,8 +47,11 @@ export default function LeaderboardPage() {
     setEvent(ev)
 
     const roundInfo = getActiveRound(ev.status)
+    // Only show leaderboard for stroke play morning rounds
     if (!roundInfo?.round || roundInfo.round.includes('afternoon') || roundInfo.round === 'sunday_morning') {
-      setLoading(false); return
+      setStandings([])
+      setLoading(false)
+      return
     }
 
     const day = roundInfo.round.split('_')[0]
@@ -62,14 +65,14 @@ export default function LeaderboardPage() {
     const courseHoles = holesRes.data || []
     setHoles(courseHoles)
 
-    const withScores = (scoresRes.data || [])
-      .filter(sc => (sc.total_score > 0) || (sc.holes_completed > 0))
-      .map(sc => ({
-        ...sc,
-        hole_scores: typeof sc.hole_scores === 'string' ? JSON.parse(sc.hole_scores) : (sc.hole_scores || {}),
-      }))
+    // Show ALL event players on the leaderboard — not just those with scores
+    // Players without scores appear at the bottom with dashes
+    const scored = (scoresRes.data || []).map(sc => ({
+      ...sc,
+      hole_scores: typeof sc.hole_scores === 'string' ? JSON.parse(sc.hole_scores) : (sc.hole_scores || {}),
+    }))
 
-    setStandings(sortPlayersByScore(withScores, courseHoles))
+    setStandings(sortPlayersByScore(scored, courseHoles))
     setLastUpdated(new Date())
     setLoading(false)
   }, [])
