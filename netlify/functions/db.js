@@ -64,21 +64,27 @@ async function handleAction(sql, action, p = {}) {
 
     case 'upsert_event': {
       const { year, name, event_date, friday_course_id, saturday_course_id, sunday_course_id,
-              friday_tee_time, saturday_tee_time, sunday_tee_time, player_count } = p
+              friday_tee_time, friday_afternoon_tee_time,
+              saturday_tee_time, saturday_afternoon_tee_time,
+              sunday_tee_time, player_count } = p
       const rows = await sql`
         INSERT INTO events (year, name, event_date, friday_course_id, saturday_course_id,
-          sunday_course_id, friday_tee_time, saturday_tee_time, sunday_tee_time, player_count)
+          sunday_course_id, friday_tee_time, friday_afternoon_tee_time,
+          saturday_tee_time, saturday_afternoon_tee_time, sunday_tee_time, player_count)
         VALUES (${year}, ${name || 'Annual Golf Outing'}, ${event_date},
           ${friday_course_id || null}, ${saturday_course_id || null}, ${sunday_course_id || null},
-          ${friday_tee_time || null}, ${saturday_tee_time || null}, ${sunday_tee_time || null},
-          ${player_count || 20})
+          ${friday_tee_time || null}, ${friday_afternoon_tee_time || null},
+          ${saturday_tee_time || null}, ${saturday_afternoon_tee_time || null},
+          ${sunday_tee_time || null}, ${player_count || 20})
         ON CONFLICT (year) DO UPDATE SET
           name = EXCLUDED.name, event_date = EXCLUDED.event_date,
           friday_course_id = EXCLUDED.friday_course_id,
           saturday_course_id = EXCLUDED.saturday_course_id,
           sunday_course_id = EXCLUDED.sunday_course_id,
           friday_tee_time = EXCLUDED.friday_tee_time,
+          friday_afternoon_tee_time = EXCLUDED.friday_afternoon_tee_time,
           saturday_tee_time = EXCLUDED.saturday_tee_time,
+          saturday_afternoon_tee_time = EXCLUDED.saturday_afternoon_tee_time,
           sunday_tee_time = EXCLUDED.sunday_tee_time,
           player_count = EXCLUDED.player_count
         RETURNING *`
@@ -184,7 +190,7 @@ async function handleAction(sql, action, p = {}) {
     case 'toggle_event_player': {
       if (p.add) {
         await sql`INSERT INTO event_players (event_id, player_id)
-          VALUES (${p.event_id}, ${p.player_id}) ON CONFLICT DO NOTHING`
+          VALUES (${p.event_id}, ${p.player_id}) ON CONFLICT (event_id, player_id) DO NOTHING`
       } else {
         await sql`DELETE FROM event_players
           WHERE event_id = ${p.event_id} AND player_id = ${p.player_id}`

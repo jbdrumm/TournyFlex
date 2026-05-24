@@ -52,7 +52,7 @@ export default function CommissionerPage() {
 function EventTab() {
   const [events, setEvents] = useState([])
   const [courses, setCourses] = useState([])
-  const [form, setForm] = useState({ year: new Date().getFullYear(), event_date: '', friday_course_id: '', saturday_course_id: '', sunday_course_id: '', friday_tee_time: '', saturday_tee_time: '', sunday_tee_time: '', player_count: 20 })
+  const [form, setForm] = useState({ year: new Date().getFullYear(), event_date: '', friday_course_id: '', saturday_course_id: '', sunday_course_id: '', friday_tee_time: '', friday_afternoon_tee_time: '', saturday_tee_time: '', saturday_afternoon_tee_time: '', sunday_tee_time: '', player_count: 20 })
   const [saving, setSaving] = useState(false)
   const [toast, setToast] = useState(null)
 
@@ -113,20 +113,42 @@ function EventTab() {
         </div>
 
         <p className="text-xs text-muted text-mono" style={{ marginBottom: 12, textTransform: 'uppercase' }}>Course Assignments</p>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          <CourseSelect label="Friday Course" field="friday_course_id" />
-          <div className="form-group">
-            <label>Friday Tee Time</label>
-            <input type="time" className="input" value={form.friday_tee_time} onChange={e => setForm(f => ({ ...f, friday_tee_time: e.target.value }))} />
+        {/* Friday */}
+        <div style={{ background: 'var(--green-deep)', borderRadius: 'var(--radius)', padding: '12px', marginBottom: 12 }}>
+          <p className="text-xs text-muted text-mono" style={{ marginBottom: 10, textTransform: 'uppercase' }}>Friday</p>
+          <CourseSelect label="Course" field="friday_course_id" />
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div className="form-group">
+              <label>Morning Tee Time</label>
+              <input type="time" className="input" value={form.friday_tee_time} onChange={e => setForm(f => ({ ...f, friday_tee_time: e.target.value }))} />
+            </div>
+            <div className="form-group">
+              <label>Afternoon Tee Time</label>
+              <input type="time" className="input" value={form.friday_afternoon_tee_time} onChange={e => setForm(f => ({ ...f, friday_afternoon_tee_time: e.target.value }))} />
+            </div>
           </div>
-          <CourseSelect label="Saturday Course" field="saturday_course_id" />
-          <div className="form-group">
-            <label>Saturday Tee Time</label>
-            <input type="time" className="input" value={form.saturday_tee_time} onChange={e => setForm(f => ({ ...f, saturday_tee_time: e.target.value }))} />
+        </div>
+        {/* Saturday */}
+        <div style={{ background: 'var(--green-deep)', borderRadius: 'var(--radius)', padding: '12px', marginBottom: 12 }}>
+          <p className="text-xs text-muted text-mono" style={{ marginBottom: 10, textTransform: 'uppercase' }}>Saturday</p>
+          <CourseSelect label="Course" field="saturday_course_id" />
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div className="form-group">
+              <label>Morning Tee Time</label>
+              <input type="time" className="input" value={form.saturday_tee_time} onChange={e => setForm(f => ({ ...f, saturday_tee_time: e.target.value }))} />
+            </div>
+            <div className="form-group">
+              <label>Afternoon Tee Time</label>
+              <input type="time" className="input" value={form.saturday_afternoon_tee_time} onChange={e => setForm(f => ({ ...f, saturday_afternoon_tee_time: e.target.value }))} />
+            </div>
           </div>
-          <CourseSelect label="Sunday Course" field="sunday_course_id" />
+        </div>
+        {/* Sunday */}
+        <div style={{ background: 'var(--green-deep)', borderRadius: 'var(--radius)', padding: '12px', marginBottom: 12 }}>
+          <p className="text-xs text-muted text-mono" style={{ marginBottom: 10, textTransform: 'uppercase' }}>Sunday</p>
+          <CourseSelect label="Course" field="sunday_course_id" />
           <div className="form-group">
-            <label>Sunday Tee Time</label>
+            <label>Tee Time</label>
             <input type="time" className="input" value={form.sunday_tee_time} onChange={e => setForm(f => ({ ...f, sunday_tee_time: e.target.value }))} />
           </div>
         </div>

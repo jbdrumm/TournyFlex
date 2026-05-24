@@ -95,14 +95,15 @@ export default function HomePage() {
                 {/* Weekend schedule */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 16 }}>
                   {[
-                    { label: 'Friday', course: event.friday_course_name, time: event.friday_tee_time },
-                    { label: 'Saturday', course: event.saturday_course_name, time: event.saturday_tee_time },
-                    { label: 'Sunday', course: event.sunday_course_name, time: event.sunday_tee_time },
-                  ].map(({ label, course, time }) => (
+                    { label: 'Friday', course: event.friday_course_name, amTime: event.friday_tee_time, pmTime: event.friday_afternoon_tee_time },
+                    { label: 'Saturday', course: event.saturday_course_name, amTime: event.saturday_tee_time, pmTime: event.saturday_afternoon_tee_time },
+                    { label: 'Sunday', course: event.sunday_course_name, amTime: event.sunday_tee_time, pmTime: null },
+                  ].map(({ label, course, amTime, pmTime }) => (
                     <div key={label} className="card card-sm" style={{ background: 'var(--green-deep)', margin: 0, padding: '10px 12px' }}>
                       <div className="text-xs text-muted" style={{ marginBottom: 2 }}>{label}</div>
                       <div className="text-xs" style={{ fontWeight: 500, lineHeight: 1.3 }}>{course || <span className="text-muted">TBD</span>}</div>
-                      {time && <div className="text-xs text-mono text-muted" style={{ marginTop: 2 }}>{formatTime(time)}</div>}
+                      {amTime && <div className="text-xs text-mono text-muted" style={{ marginTop: 2 }}>AM {formatTime(amTime)}</div>}
+                      {pmTime && <div className="text-xs text-mono text-muted">PM {formatTime(pmTime)}</div>}
                     </div>
                   ))}
                 </div>
