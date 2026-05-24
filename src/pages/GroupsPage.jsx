@@ -205,7 +205,7 @@ export default function GroupsPage() {
                     marginBottom: 6, background: 'var(--green-dark)',
                     border: isMine ? '2px solid var(--gold)' : '1px solid var(--green-mid)',
                     borderRadius: 'var(--radius)', padding: '10px 12px',
-  }>
+                  }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                         <div style={{ width: 8, height: 8, borderRadius: '50%', background: TEAM_COLORS[idx % TEAM_COLORS.length], flexShrink: 0 }} />
