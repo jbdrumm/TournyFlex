@@ -115,3 +115,9 @@ CREATE POLICY "Anon delete event_groups" ON event_groups FOR DELETE USING (true)
 CREATE POLICY "Public read group_players" ON group_players FOR SELECT USING (true);
 CREATE POLICY "Anon insert group_players" ON group_players FOR INSERT WITH CHECK (true);
 CREATE POLICY "Anon delete group_players" ON group_players FOR DELETE USING (true);
+
+-- ── PM COURSE COLUMNS (for multiple-course days like Manistee) ────
+-- When multiple_courses=true, AM and PM can use different courses
+ALTER TABLE events
+  ADD COLUMN IF NOT EXISTS friday_pm_course_id    uuid REFERENCES courses(id),
+  ADD COLUMN IF NOT EXISTS saturday_pm_course_id  uuid REFERENCES courses(id);

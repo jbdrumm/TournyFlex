@@ -53,9 +53,29 @@ export default function CommissionerPage() {
 function EventTab() {
   const [events, setEvents] = useState([])
   const [courses, setCourses] = useState([])
-  const [form, setForm] = useState({ year: new Date().getFullYear(), event_date: '', friday_course_id: '', saturday_course_id: '', sunday_course_id: '', friday_tee_time: '', friday_afternoon_tee_time: '', saturday_tee_time: '', saturday_afternoon_tee_time: '', sunday_tee_time: '', player_count: 20 })
+  const [selectedEventId, setSelectedEventId] = useState(null)
+  const [creating, setCreating] = useState(false)
+  const [form, setForm] = useState(null) // null until an event is loaded or Create clicked
   const [saving, setSaving] = useState(false)
   const [toast, setToast] = useState(null)
+
+  const EMPTY_FORM = {
+    year: new Date().getFullYear(),
+    event_date: '',
+    status: 'upcoming',
+    player_count: 20,
+    friday_course_id: '',
+    friday_pm_course_id: '',   // only used if multiple_courses
+    friday_tee_time: '',
+    friday_afternoon_tee_time: '',
+    saturday_course_id: '',
+    saturday_pm_course_id: '', // only used if multiple_courses
+    saturday_tee_time: '',
+    saturday_afternoon_tee_time: '',
+    sunday_course_id: '',
+    sunday_tee_time: '',
+    multiple_courses: false,   // enables separate AM/PM course selectors
+  }
 
   useEffect(() => { fetchData() }, [])
 
@@ -63,120 +83,243 @@ function EventTab() {
     const [{ data: evs }, { data: cs }] = await Promise.all([db('list_events'), db('list_courses')])
     setEvents(evs || [])
     setCourses(cs || [])
+    // Default: load the most recent non-complete event
+    const current = (evs || []).find(e => e.status !== 'complete') || evs?.[0]
+    if (current) loadEvent(current, evs || [])
   }
+
+  const loadEvent = (ev, evList) => {
+    setCreating(false)
+    setSelectedEventId(ev.id)
+    setForm({
+      ...EMPTY_FORM,
+      year: ev.year,
+      event_date: ev.event_date || '',
+      status: ev.status || 'upcoming',
+      player_count: ev.player_count || 20,
+      friday_course_id: ev.friday_course_id || '',
+      friday_tee_time: ev.friday_tee_time || '',
+      friday_afternoon_tee_time: ev.friday_afternoon_tee_time || '',
+      saturday_course_id: ev.saturday_course_id || '',
+      saturday_tee_time: ev.saturday_tee_time || '',
+      saturday_afternoon_tee_time: ev.saturday_afternoon_tee_time || '',
+      sunday_course_id: ev.sunday_course_id || '',
+      sunday_tee_time: ev.sunday_tee_time || '',
+      multiple_courses: false,
+    })
+  }
+
+  const startCreate = () => {
+    setCreating(true)
+    setSelectedEventId(null)
+    setForm({ ...EMPTY_FORM })
+  }
+
+  const set = (field, value) => setForm(f => ({ ...f, [field]: value }))
 
   const save = async () => {
+    if (!form) return
     setSaving(true)
-    const result = await db('upsert_event', form).catch(e => ({ error: e.message }))
+    const payload = { ...form }
+    // If not multiple courses, PM course = AM course for each day
+    if (!form.multiple_courses) {
+      payload.friday_pm_course_id = form.friday_course_id
+      payload.saturday_pm_course_id = form.saturday_course_id
+    }
+    const result = await db('upsert_event', payload).catch(e => ({ error: e.message }))
     setSaving(false)
     if (result.error) showToast(result.error, 'error')
-    else { showToast('Event saved!', 'success'); fetchData() }
+    else {
+      showToast(creating ? 'Event created!' : 'Event saved!', 'success')
+      setCreating(false)
+      fetchData()
+    }
   }
 
-  const updateStatus = async (id, status) => {
-    await db('update_event_status', { id, status, active_round: STATUS_FLOW.find(s => s.status === status)?.round || null })
+  const updateStatus = async (status) => {
+    if (!selectedEventId) return
+    await db('update_event_status', {
+      id: selectedEventId, status,
+      active_round: STATUS_FLOW.find(s => s.status === status)?.round || null
+    })
+    setForm(f => ({ ...f, status }))
     fetchData()
+    showToast('Status updated', 'success')
   }
 
   const showToast = (msg, type) => { setToast({ msg, type }); setTimeout(() => setToast(null), 3000) }
 
   const CourseSelect = ({ label, field }) => (
-    <div className="form-group">
+    <div className="form-group" style={{ margin: 0 }}>
       <label>{label}</label>
-      <select className="input" value={form[field] || ''} onChange={e => setForm(f => ({ ...f, [field]: e.target.value }))}>
+      <select className="input" value={form?.[field] || ''} onChange={e => set(field, e.target.value)}>
         <option value="">Select course...</option>
         {courses.map(c => <option key={c.id} value={c.id}>{c.name} (par {c.par})</option>)}
       </select>
     </div>
   )
 
+  const TimeInput = ({ label, field }) => (
+    <div className="form-group" style={{ margin: 0 }}>
+      <label>{label}</label>
+      <input type="time" className="input" value={form?.[field] || ''} onChange={e => set(field, e.target.value)} />
+    </div>
+  )
+
+  const selectedEvent = events.find(e => e.id === selectedEventId)
+
   return (
     <div>
-      <div className="card">
-        <h3 style={{ marginBottom: 16 }}>Create / Update Event</h3>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          <div className="form-group">
-            <label>Year</label>
-            <input type="number" className="input" value={form.year} onChange={e => setForm(f => ({ ...f, year: parseInt(e.target.value) }))} />
-          </div>
-          <div className="form-group">
-            <label>Player Count</label>
-            <select className="input" value={form.player_count} onChange={e => setForm(f => ({ ...f, player_count: parseInt(e.target.value) }))}>
-              <option value={16}>16 players</option>
-              <option value={20}>20 players</option>
-              <option value={24}>24 players</option>
-            </select>
-          </div>
-        </div>
-        <div className="form-group">
-          <label>Event Date (Friday)</label>
-          <input type="date" className="input" value={form.event_date} onChange={e => setForm(f => ({ ...f, event_date: e.target.value }))} />
-        </div>
-
-        <p className="text-xs text-muted text-mono" style={{ marginBottom: 12, textTransform: 'uppercase' }}>Course Assignments</p>
-        {/* Friday */}
-        <div style={{ background: 'var(--green-deep)', borderRadius: 'var(--radius)', padding: '12px', marginBottom: 12 }}>
-          <p className="text-xs text-muted text-mono" style={{ marginBottom: 10, textTransform: 'uppercase' }}>Friday</p>
-          <CourseSelect label="Course" field="friday_course_id" />
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <div className="form-group">
-              <label>Morning Tee Time</label>
-              <input type="time" className="input" value={form.friday_tee_time} onChange={e => setForm(f => ({ ...f, friday_tee_time: e.target.value }))} />
-            </div>
-            <div className="form-group">
-              <label>Afternoon Tee Time</label>
-              <input type="time" className="input" value={form.friday_afternoon_tee_time} onChange={e => setForm(f => ({ ...f, friday_afternoon_tee_time: e.target.value }))} />
-            </div>
-          </div>
-        </div>
-        {/* Saturday */}
-        <div style={{ background: 'var(--green-deep)', borderRadius: 'var(--radius)', padding: '12px', marginBottom: 12 }}>
-          <p className="text-xs text-muted text-mono" style={{ marginBottom: 10, textTransform: 'uppercase' }}>Saturday</p>
-          <CourseSelect label="Course" field="saturday_course_id" />
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <div className="form-group">
-              <label>Morning Tee Time</label>
-              <input type="time" className="input" value={form.saturday_tee_time} onChange={e => setForm(f => ({ ...f, saturday_tee_time: e.target.value }))} />
-            </div>
-            <div className="form-group">
-              <label>Afternoon Tee Time</label>
-              <input type="time" className="input" value={form.saturday_afternoon_tee_time} onChange={e => setForm(f => ({ ...f, saturday_afternoon_tee_time: e.target.value }))} />
-            </div>
-          </div>
-        </div>
-        {/* Sunday */}
-        <div style={{ background: 'var(--green-deep)', borderRadius: 'var(--radius)', padding: '12px', marginBottom: 12 }}>
-          <p className="text-xs text-muted text-mono" style={{ marginBottom: 10, textTransform: 'uppercase' }}>Sunday</p>
-          <CourseSelect label="Course" field="sunday_course_id" />
-          <div className="form-group">
-            <label>Tee Time</label>
-            <input type="time" className="input" value={form.sunday_tee_time} onChange={e => setForm(f => ({ ...f, sunday_tee_time: e.target.value }))} />
-          </div>
-        </div>
-        <button className="btn btn-primary btn-full" onClick={save} disabled={saving}>{saving ? 'Saving...' : 'Save Event'}</button>
+      {/* Header: event selector + Create button */}
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 16 }}>
+        <select className="input" style={{ flex: 1 }}
+          value={selectedEventId || ''}
+          onChange={e => {
+            const ev = events.find(ev => ev.id === e.target.value)
+            if (ev) loadEvent(ev, events)
+          }}>
+          <option value="">Select event to update...</option>
+          {events.map(ev => (
+            <option key={ev.id} value={ev.id}>{ev.year} Outing — {ev.status.replace(/_/g,' ')}</option>
+          ))}
+        </select>
+        <button className="btn btn-secondary btn-sm" onClick={startCreate} style={{ flexShrink: 0 }}>
+          + Create
+        </button>
       </div>
 
-      {events.map(ev => (
-        <div key={ev.id} className="card card-sm">
-          <div className="flex justify-between items-center" style={{ marginBottom: 8 }}>
-            <strong>{ev.year}</strong>
-            <span className={`badge ${ev.status === 'upcoming' || ev.status === 'complete' ? 'badge-gray' : 'badge-gold'}`}>{ev.status.replace(/_/g, ' ')}</span>
+      {form && (
+        <div className="card">
+          <h3 style={{ marginBottom: 16 }}>{creating ? 'New Event' : `${form.year} Outing`}</h3>
+
+          {/* Row 1: Year + Date */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+            <div className="form-group" style={{ margin: 0 }}>
+              <label>Year</label>
+              <input type="number" className="input" value={form.year}
+                onChange={e => set('year', parseInt(e.target.value))} />
+            </div>
+            <div className="form-group" style={{ margin: 0 }}>
+              <label>Event Date (Friday)</label>
+              <input type="date" className="input" value={form.event_date}
+                onChange={e => set('event_date', e.target.value)} />
+            </div>
           </div>
-          {ev.friday_course_name && <p className="text-xs text-muted" style={{ marginBottom: 6 }}>Fri: {ev.friday_course_name} · Sat: {ev.saturday_course_name || '?'} · Sun: {ev.sunday_course_name || '?'}</p>}
-          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-            {STATUS_FLOW.map(s => (
-              <button key={s.status} className={`btn btn-sm ${ev.status === s.status ? 'btn-primary' : 'btn-ghost'}`} onClick={() => updateStatus(ev.id, s.status)}>
-                {s.label}
-              </button>
-            ))}
+
+          {/* Round status tabs — only show when updating existing event */}
+          {!creating && selectedEvent && (
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ display: 'block', marginBottom: 8 }}>Round Status</label>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 4 }}>
+                {STATUS_FLOW.map(s => (
+                  <button key={s.status}
+                    onClick={() => updateStatus(s.status)}
+                    style={{
+                      padding: '8px 4px', border: 'none', borderRadius: 'var(--radius)',
+                      background: form.status === s.status ? 'var(--gold)' : 'var(--green-deep)',
+                      color: form.status === s.status ? 'var(--green-deep)' : 'var(--gray-300)',
+                      fontFamily: 'var(--font-body)', fontSize: '0.7rem',
+                      fontWeight: form.status === s.status ? 600 : 400,
+                      cursor: 'pointer', textAlign: 'center', lineHeight: 1.3,
+                    }}>
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Player count */}
+          <div className="form-group" style={{ marginBottom: 16 }}>
+            <label>Player Count</label>
+            <select className="input" value={form.player_count} onChange={e => set('player_count', parseInt(e.target.value))}>
+              <option value={16}>16 players — 4 teams</option>
+              <option value={20}>20 players — 5 teams</option>
+              <option value={24}>24 players — 6 teams</option>
+            </select>
           </div>
+
+          {/* Multiple courses toggle */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, padding: '10px 12px', background: 'var(--green-deep)', borderRadius: 'var(--radius)' }}>
+            <button onClick={() => set('multiple_courses', !form.multiple_courses)}
+              style={{
+                width: 20, height: 20, borderRadius: 3, flexShrink: 0,
+                background: form.multiple_courses ? 'var(--gold)' : 'transparent',
+                border: `2px solid ${form.multiple_courses ? 'var(--gold)' : 'var(--green-mid)'}`,
+                cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: '0.7rem', color: 'var(--green-deep)',
+              }}>
+              {form.multiple_courses ? '✓' : ''}
+            </button>
+            <div>
+              <div style={{ fontSize: '0.85rem', fontWeight: 500 }}>Multiple Courses</div>
+              <div className="text-xs text-muted">Separate AM and PM course per day (e.g. Manistee Retreat AM / Revenge PM)</div>
+            </div>
+          </div>
+
+          {/* Course Assignments */}
+          <div>
+            {/* FRIDAY */}
+            <div style={{ marginBottom: 14, background: 'var(--green-deep)', borderRadius: 'var(--radius)', padding: 12 }}>
+              <p className="text-xs text-muted text-mono" style={{ marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Friday</p>
+              {form.multiple_courses ? (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  <CourseSelect label="AM Course" field="friday_course_id" />
+                  <TimeInput label="AM Tee Time" field="friday_tee_time" />
+                  <CourseSelect label="PM Course" field="friday_pm_course_id" />
+                  <TimeInput label="PM Tee Time" field="friday_afternoon_tee_time" />
+                </div>
+              ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  <CourseSelect label="Course" field="friday_course_id" />
+                  <div />
+                  <TimeInput label="AM Tee Time" field="friday_tee_time" />
+                  <TimeInput label="PM Tee Time" field="friday_afternoon_tee_time" />
+                </div>
+              )}
+            </div>
+
+            {/* SATURDAY */}
+            <div style={{ marginBottom: 14, background: 'var(--green-deep)', borderRadius: 'var(--radius)', padding: 12 }}>
+              <p className="text-xs text-muted text-mono" style={{ marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Saturday</p>
+              {form.multiple_courses ? (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  <CourseSelect label="AM Course" field="saturday_course_id" />
+                  <TimeInput label="AM Tee Time" field="saturday_tee_time" />
+                  <CourseSelect label="PM Course" field="saturday_pm_course_id" />
+                  <TimeInput label="PM Tee Time" field="saturday_afternoon_tee_time" />
+                </div>
+              ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  <CourseSelect label="Course" field="saturday_course_id" />
+                  <div />
+                  <TimeInput label="AM Tee Time" field="saturday_tee_time" />
+                  <TimeInput label="PM Tee Time" field="saturday_afternoon_tee_time" />
+                </div>
+              )}
+            </div>
+
+            {/* SUNDAY */}
+            <div style={{ marginBottom: 16, background: 'var(--green-deep)', borderRadius: 'var(--radius)', padding: 12 }}>
+              <p className="text-xs text-muted text-mono" style={{ marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Sunday</p>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <CourseSelect label="Scramble Course" field="sunday_course_id" />
+                <TimeInput label="Tee Time" field="sunday_tee_time" />
+              </div>
+            </div>
+          </div>
+
+          <button className="btn btn-primary btn-full" onClick={save} disabled={saving}>
+            {saving ? 'Saving...' : creating ? 'Create Event' : 'Save Changes'}
+          </button>
         </div>
-      ))}
+      )}
 
       {toast && <div className={`toast ${toast.type}`}>{toast.msg}</div>}
     </div>
   )
 }
+
 
 // ─── PLAYERS TAB ──────────────────────────────────────────────────────────────
 function PlayersTab() {
@@ -250,7 +393,7 @@ function PlayersTab() {
         <label>Assign players to event</label>
         <select className="input" value={eventId} onChange={e => handleEventChange(e.target.value)}>
           <option value="">Select event...</option>
-          {events.map(ev => <option key={ev.id} value={ev.id}>{ev.year} Outing</option>)}
+          {events.filter(ev => ev.status !== 'complete').map(ev => <option key={ev.id} value={ev.id}>{ev.year} Outing</option>)}
         </select>
         {eventId && <p className="text-xs text-muted" style={{ marginTop: 6 }}>{eventPlayers.length} players in this event · tap to toggle</p>}
       </div>

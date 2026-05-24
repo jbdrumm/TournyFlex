@@ -119,8 +119,7 @@ export default function HomePage() {
                     <div key={label} className="card card-sm" style={{ background: 'var(--green-deep)', margin: 0, padding: '10px 12px' }}>
                       <div className="text-xs text-muted" style={{ marginBottom: 2 }}>{label}</div>
                       <div className="text-xs" style={{ fontWeight: 500, lineHeight: 1.3 }}>{course || <span className="text-muted">TBD</span>}</div>
-                      {amTime && <div className="text-xs text-mono text-muted" style={{ marginTop: 2 }}>AM {formatTime(amTime)}</div>}
-                      {pmTime && <div className="text-xs text-mono text-muted">PM {formatTime(pmTime)}</div>}
+                      {amTime && <div className="text-xs text-mono text-muted" style={{ marginTop: 2 }}>{formatTime(amTime)}</div>}
                     </div>
                   ))}
                 </div>

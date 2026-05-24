@@ -63,23 +63,35 @@ async function handleAction(sql, action, p = {}) {
     }
 
     case 'upsert_event': {
-      const { year, name, event_date, friday_course_id, saturday_course_id, sunday_course_id,
+      const { year, name, event_date, friday_course_id, friday_pm_course_id,
+              saturday_course_id, saturday_pm_course_id, sunday_course_id,
               friday_tee_time, friday_afternoon_tee_time,
               saturday_tee_time, saturday_afternoon_tee_time,
               sunday_tee_time, player_count } = p
+      // PM course falls back to AM course if not explicitly set
+      const friPm = friday_pm_course_id || friday_course_id || null
+      const satPm = saturday_pm_course_id || saturday_course_id || null
       const rows = await sql`
-        INSERT INTO events (year, name, event_date, friday_course_id, saturday_course_id,
-          sunday_course_id, friday_tee_time, friday_afternoon_tee_time,
-          saturday_tee_time, saturday_afternoon_tee_time, sunday_tee_time, player_count)
+        INSERT INTO events (year, name, event_date,
+          friday_course_id, friday_pm_course_id,
+          saturday_course_id, saturday_pm_course_id,
+          sunday_course_id,
+          friday_tee_time, friday_afternoon_tee_time,
+          saturday_tee_time, saturday_afternoon_tee_time,
+          sunday_tee_time, player_count)
         VALUES (${year}, ${name || 'Annual Golf Outing'}, ${event_date},
-          ${friday_course_id || null}, ${saturday_course_id || null}, ${sunday_course_id || null},
+          ${friday_course_id || null}, ${friPm},
+          ${saturday_course_id || null}, ${satPm},
+          ${sunday_course_id || null},
           ${friday_tee_time || null}, ${friday_afternoon_tee_time || null},
           ${saturday_tee_time || null}, ${saturday_afternoon_tee_time || null},
           ${sunday_tee_time || null}, ${player_count || 20})
         ON CONFLICT (year) DO UPDATE SET
           name = EXCLUDED.name, event_date = EXCLUDED.event_date,
           friday_course_id = EXCLUDED.friday_course_id,
+          friday_pm_course_id = EXCLUDED.friday_pm_course_id,
           saturday_course_id = EXCLUDED.saturday_course_id,
+          saturday_pm_course_id = EXCLUDED.saturday_pm_course_id,
           sunday_course_id = EXCLUDED.sunday_course_id,
           friday_tee_time = EXCLUDED.friday_tee_time,
           friday_afternoon_tee_time = EXCLUDED.friday_afternoon_tee_time,
