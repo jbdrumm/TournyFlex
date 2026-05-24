@@ -213,21 +213,33 @@ async function handleAction(sql, action, p = {}) {
     // ── ROUND SCORES ──────────────────────────────────────────────
 
     case 'get_round_scores': {
-      // Get all scores for a specific round (day + round_time)
       const rows = await sql`
-        SELECT rs.*, p.name as player_name
+        SELECT
+          rs.id, rs.event_id, rs.player_id, rs.course_id,
+          rs.day, rs.round_time, rs.is_scramble,
+          rs.hole_scores, rs.holes_completed, rs.is_complete,
+          rs.scramble_team_id, rs.created_at,
+          p.name as player_name,
+          (SELECT COALESCE(SUM(value::int), 0)
+           FROM jsonb_each_text(rs.hole_scores)) as total_score
         FROM round_scores rs
         JOIN players p ON p.id = rs.player_id
         WHERE rs.event_id = ${p.event_id}
           AND rs.day = ${p.day}
           AND rs.round_time = ${p.round_time}
-        ORDER BY rs.total_score ASC NULLS LAST`
+        ORDER BY total_score ASC NULLS LAST`
       return { data: rows }
     }
 
     case 'get_player_round': {
       const rows = await sql`
-        SELECT * FROM round_scores
+        SELECT
+          id, event_id, player_id, course_id, day, round_time,
+          is_scramble, hole_scores, holes_completed, is_complete,
+          scramble_team_id, created_at,
+          (SELECT COALESCE(SUM(value::int), 0)
+           FROM jsonb_each_text(hole_scores)) as total_score
+        FROM round_scores
         WHERE event_id = ${p.event_id}
           AND player_id = ${p.player_id}
           AND day = ${p.day}
@@ -270,11 +282,12 @@ async function handleAction(sql, action, p = {}) {
 
     case 'get_combined_totals': {
       // Friday AM + Saturday AM totals for Sunday seeding
+      // Calculate total_score from hole_scores since column was dropped
       const rows = await sql`
         SELECT
           rs.player_id,
           p.name as player_name,
-          SUM(rs.total_score) as combined_score,
+          SUM((SELECT COALESCE(SUM(value::int), 0) FROM jsonb_each_text(rs.hole_scores))) as combined_score,
           MAX(CASE WHEN rs.day='friday' THEN rs.hole_scores END) as friday_holes,
           MAX(CASE WHEN rs.day='saturday' THEN rs.hole_scores END) as saturday_holes,
           COUNT(*) FILTER (WHERE rs.is_complete) as rounds_complete,
@@ -347,12 +360,9 @@ async function handleAction(sql, action, p = {}) {
     }
 
     case 'get_event_results': {
-      // Stroke play results: combined Fri AM + Sat AM
       const rows = await sql`
         SELECT rs.player_id, p.name as player_name,
-          SUM(rs.total_score) as combined_score,
-          MIN(rs.total_score) as best_round,
-          MAX(rs.total_score) as worst_round
+          SUM((SELECT COALESCE(SUM(value::int), 0) FROM jsonb_each_text(rs.hole_scores))) as combined_score
         FROM round_scores rs
         JOIN players p ON p.id = rs.player_id
         WHERE rs.event_id = ${p.event_id}

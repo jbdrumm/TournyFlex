@@ -213,24 +213,28 @@ export default function ScorecardPage() {
               </button>
             </div>
 
-            {/* Progress dots */}
-            <div style={{ display: 'flex', gap: 3, justifyContent: 'center', marginBottom: 12, flexWrap: 'wrap' }}>
-              {holes.map(h => {
-                const anyScore = groupPlayers.some(m => scores[m.player_id]?.[String(h.hole_number)])
-                return (
-                  <button key={h.hole_number} onClick={() => setCurrentHole(h.hole_number)}
-                    style={{
-                      width: 22, height: 22, borderRadius: '50%', border: 'none', cursor: 'pointer',
-                      background: h.hole_number === currentHole ? 'var(--gold)'
-                        : anyScore ? 'var(--green-light)' : 'var(--green-mid)',
-                      fontSize: '0.62rem', fontFamily: 'var(--font-mono)',
-                      color: h.hole_number === currentHole ? 'var(--green-deep)' : 'var(--cream)',
-                      fontWeight: h.hole_number === currentHole ? 700 : 400,
-                    }}>
-                    {h.hole_number}
-                  </button>
-                )
-              })}
+            {/* Progress dots — 2 fixed rows: 1-9 top, 10-18 bottom */}
+            <div style={{ marginBottom: 12 }}>
+              {[holes.slice(0, 9), holes.slice(9, 18)].map((row, rowIdx) => (
+                <div key={rowIdx} style={{ display: 'flex', gap: 3, justifyContent: 'center', marginBottom: rowIdx === 0 ? 3 : 0 }}>
+                  {row.map(h => {
+                    const anyScore = groupPlayers.some(m => scores[m.player_id]?.[String(h.hole_number)])
+                    return (
+                      <button key={h.hole_number} onClick={() => setCurrentHole(h.hole_number)}
+                        style={{
+                          width: 22, height: 22, borderRadius: '50%', border: 'none', cursor: 'pointer',
+                          background: h.hole_number === currentHole ? 'var(--gold)'
+                            : anyScore ? 'var(--green-light)' : 'var(--green-mid)',
+                          fontSize: '0.62rem', fontFamily: 'var(--font-mono)',
+                          color: h.hole_number === currentHole ? 'var(--green-deep)' : 'var(--cream)',
+                          fontWeight: h.hole_number === currentHole ? 700 : 400,
+                        }}>
+                        {h.hole_number}
+                      </button>
+                    )
+                  })}
+                </div>
+              ))}
             </div>
 
             <div style={{ height: '1px', background: 'var(--green-mid)', marginBottom: 12 }} />
