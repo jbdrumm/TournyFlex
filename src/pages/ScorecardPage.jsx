@@ -78,19 +78,19 @@ export default function ScorecardPage() {
     })
   }
 
-  const handleSaveAll = async () => {
+  const saveProgress = async (silent = false) => {
     if (!event || groupPlayers.length === 0) return
-    setSaving(true)
     const roundInfo = getActiveRound(event.status)
     const day = roundInfo?.round?.split('_')[0]
     const course = getCourseForRound(event, day)
-    if (!course?.id) { setSaving(false); return }
+    if (!course?.id) return
 
     for (const member of groupPlayers) {
       const holeScores = {}
       Object.entries(scores[member.player_id] || {}).forEach(([k, v]) => { if (v) holeScores[k] = parseInt(v) })
-      const total = calculateTotal(holeScores)
       const holesCompleted = Object.keys(holeScores).length
+      if (holesCompleted === 0) continue
+      const total = calculateTotal(holeScores)
       await db('upsert_round_score', {
         event_id: event.id, player_id: member.player_id, course_id: course.id,
         day, round_time: 'morning', is_scramble: false,
@@ -98,8 +98,14 @@ export default function ScorecardPage() {
         holes_completed: holesCompleted, is_complete: holesCompleted >= 18,
       })
     }
+    if (!silent) showToast('Saved ✓', 'success')
+  }
+
+  const handleNextHole = async () => {
+    setSaving(true)
+    await saveProgress(true)
     setSaving(false)
-    showToast(`Saved ${groupPlayers.length} scorecards! ✓`, 'success')
+    setCurrentHole(h => Math.min(18, h + 1))
   }
 
   const handlePhoto = async (e) => {
@@ -298,16 +304,17 @@ export default function ScorecardPage() {
 
             {/* Action row */}
             <div style={{ display: 'flex', gap: 8 }}>
-              {currentHole < 18 && (
-                <button className="btn btn-secondary" style={{ flex: 1 }}
-                  onClick={() => setCurrentHole(h => h + 1)}>
-                  Next →
+              {currentHole < 18 ? (
+                <button className="btn btn-primary btn-full"
+                  onClick={handleNextHole} disabled={saving}>
+                  {saving ? 'Saving...' : 'Save & Next →'}
+                </button>
+              ) : (
+                <button className="btn btn-primary btn-full"
+                  onClick={() => saveProgress(false)} disabled={saving}>
+                  {saving ? 'Saving...' : 'Save Hole 18 ✓'}
                 </button>
               )}
-              <button className="btn btn-primary" style={{ flex: 1 }}
-                onClick={handleSaveAll} disabled={saving}>
-                {saving ? 'Saving...' : `Save All`}
-              </button>
             </div>
           </div>
         )}
