@@ -183,29 +183,31 @@ export default function ScorecardPage() {
           {course?.name && <p className="text-muted text-sm" style={{ marginTop: 2 }}>{course.name}{course.par ? ` · Par ${course.par}` : ''}</p>}
         </div>
 
-        {/* Manual / Photo tabs */}
-        <div style={{ display: 'flex', gap: 4, marginBottom: 12, background: 'var(--green-deep)', borderRadius: 'var(--radius)', padding: 3 }}>
-          {['manual', 'photo'].map(t => (
-            <button key={t} onClick={() => setActiveTab(t)} style={{
-              flex: 1, padding: '8px', border: 'none', borderRadius: 5,
-              background: activeTab === t ? 'var(--green-mid)' : 'transparent',
-              color: activeTab === t ? 'var(--cream)' : 'var(--gray-500)',
-              fontFamily: 'var(--font-body)', fontSize: '0.85rem', fontWeight: 500, cursor: 'pointer',
-            }}>
-              {t === 'manual' ? '📝 Hole by Hole' : '📸 Photo Upload'}
-            </button>
-          ))}
-        </div>
-
-        {/* Photo upload */}
-        {activeTab === 'photo' && (
-          <div className="card" style={{ textAlign: 'center', marginBottom: 12 }}>
-            <p style={{ marginBottom: 8, fontWeight: 500 }}>Upload your group's scorecard</p>
-            <p className="text-muted text-sm" style={{ marginBottom: 16 }}>Claude AI will parse scores for all players.</p>
-            <input ref={fileRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={handlePhoto} />
-            <button className="btn btn-primary btn-full" onClick={() => fileRef.current?.click()} disabled={uploading}>
-              {uploading ? 'Analyzing...' : '📸 Take / Choose Photo'}
-            </button>
+        {/* Photo upload — commissioner only */}
+        {isCommissioner && (
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ display: 'flex', gap: 4, marginBottom: 8, background: 'var(--green-deep)', borderRadius: 'var(--radius)', padding: 3 }}>
+              {['manual', 'photo'].map(t => (
+                <button key={t} onClick={() => setActiveTab(t)} style={{
+                  flex: 1, padding: '8px', border: 'none', borderRadius: 5,
+                  background: activeTab === t ? 'var(--green-mid)' : 'transparent',
+                  color: activeTab === t ? 'var(--cream)' : 'var(--gray-500)',
+                  fontFamily: 'var(--font-body)', fontSize: '0.85rem', fontWeight: 500, cursor: 'pointer',
+                }}>
+                  {t === 'manual' ? '📝 Hole by Hole' : '📸 Photo Upload'}
+                </button>
+              ))}
+            </div>
+            {activeTab === 'photo' && (
+              <div className="card" style={{ textAlign: 'center' }}>
+                <p style={{ marginBottom: 8, fontWeight: 500 }}>Upload group scorecard</p>
+                <p className="text-muted text-sm" style={{ marginBottom: 16 }}>Claude AI will parse scores for all players.</p>
+                <input ref={fileRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={handlePhoto} />
+                <button className="btn btn-primary btn-full" onClick={() => fileRef.current?.click()} disabled={uploading}>
+                  {uploading ? 'Analyzing...' : '📸 Take / Choose Photo'}
+                </button>
+              </div>
+            )}
           </div>
         )}
 

@@ -20,7 +20,12 @@ export default function HistoryPage() {
     }
   }
 
-  const fmtDate = (d) => d ? new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : ''
+  const fmtDate = (d) => {
+    if (!d) return ''
+    // Handle both 'YYYY-MM-DD' and full ISO timestamps
+    const dateStr = String(d).split('T')[0]
+    return new Date(dateStr + 'T12:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+  }
   const svp = (score, par) => { if (!score || !par) return '–'; const d = score - par; return d === 0 ? 'E' : d > 0 ? `+${d}` : `${d}` }
 
   return (
