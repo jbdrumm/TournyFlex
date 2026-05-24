@@ -197,31 +197,31 @@ export default function GroupsPage() {
                 </div>
               )}
 
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
               {groups.map((group, idx) => {
                 const isMine = isMyGroup(group.players)
                 const teeTime = calcTeeTime(baseTeeTime, group.group_number)
                 return (
                   <div key={group.id} style={{
-                    marginBottom: 6, background: 'var(--green-dark)',
+                    background: 'var(--green-dark)',
                     border: isMine ? '2px solid var(--gold)' : '1px solid var(--green-mid)',
-                    borderRadius: 'var(--radius)', padding: '10px 12px',
+                    borderRadius: 'var(--radius)', padding: '8px 10px',
                   }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <div style={{ width: 8, height: 8, borderRadius: '50%', background: TEAM_COLORS[idx % TEAM_COLORS.length], flexShrink: 0 }} />
-                        <span style={{ fontFamily: 'var(--font-sans)', fontSize: '0.9rem', fontWeight: 600 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <div style={{ width: 7, height: 7, borderRadius: '50%', background: TEAM_COLORS[idx % TEAM_COLORS.length], flexShrink: 0 }} />
+                        <span style={{ fontFamily: 'var(--font-sans)', fontSize: '0.82rem', fontWeight: 600 }}>
                           Group {group.group_number}
                         </span>
-                        
                       </div>
                       {teeTime && (
-                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.8rem', color: 'var(--gold)' }}>{formatTime(teeTime)}</span>
+                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.72rem', color: 'var(--gold)' }}>{formatTime(teeTime)}</span>
                       )}
                     </div>
                     {(group.players || []).map(p => (
-                      <div key={p.player_id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                        <span style={{ width: 6, height: 6, borderRadius: '50%', flexShrink: 0, background: player?.id === p.player_id ? 'var(--gold)' : 'var(--green-mid)' }} />
-                        <span style={{ fontSize: '0.875rem', fontWeight: player?.id === p.player_id ? 600 : 400, color: player?.id === p.player_id ? 'var(--gold)' : 'var(--cream)' }}>
+                      <div key={p.player_id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '3px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                        <span style={{ width: 5, height: 5, borderRadius: '50%', flexShrink: 0, background: player?.id === p.player_id ? 'var(--gold)' : 'var(--green-mid)' }} />
+                        <span style={{ fontSize: '0.78rem', fontWeight: player?.id === p.player_id ? 600 : 400, color: player?.id === p.player_id ? 'var(--gold)' : 'var(--cream)' }}>
                           {p.name}
                         </span>
                       </div>
@@ -229,6 +229,7 @@ export default function GroupsPage() {
                   </div>
                 )
               })}
+              </div>
             </>
           )
         ) : (

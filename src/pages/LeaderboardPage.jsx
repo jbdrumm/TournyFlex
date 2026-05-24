@@ -317,13 +317,13 @@ function DetailView({ standings, holes, par, currentPlayer }) {
                   {h.hole_number}
                 </th>
               ))}
-              {['Tot', '+/–', 'Thru'].map((h, i) => (
+              {['Tot', '+/–'].map((h, i) => (
                 <th key={h} style={{
                   padding: '5px 6px', textAlign: 'right', fontFamily: 'var(--font-mono)',
                   fontSize: '0.65rem', color: 'var(--gray-500)', fontWeight: 500,
                   background: 'var(--green-deep)',
                   borderLeft: i === 0 ? '2px solid var(--green-mid)' : 'none',
-                  minWidth: h === 'Thru' ? 34 : 42,
+                  minWidth: 42,
                 }}>{h}</th>
               ))}
             </tr>
@@ -378,12 +378,7 @@ function DetailView({ standings, holes, par, currentPlayer }) {
                     background: rowBg, borderBottom: '1px solid var(--green-mid)',
                     color: cls === 'score-under' ? 'var(--blue-birdie)' : cls === 'score-over' ? 'var(--red)' : 'var(--gray-300)',
                   }}>{txt}</td>
-                  <td style={{
-                    padding: '7px 6px', fontFamily: 'var(--font-mono)', fontSize: '0.75rem', textAlign: 'right',
-                    background: rowBg, borderBottom: '1px solid var(--green-mid)',
-                    color: thruTxt === 'F' ? 'var(--green-bright)' : 'var(--gray-500)',
-                    fontWeight: thruTxt === 'F' ? 600 : 400,
-                  }}>{thruTxt}</td>
+
                 </tr>
               )
             })}

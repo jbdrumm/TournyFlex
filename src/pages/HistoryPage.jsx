@@ -97,7 +97,7 @@ export default function HistoryPage() {
             <div className="form-group" style={{ marginBottom: 16 }}>
               <select className="input" value={selectedYear || ''} onChange={e => setSelectedYear(parseInt(e.target.value))}>
                 {events.map(ev => (
-                  <option key={ev.year} value={ev.year}>{ev.year} — {fmtDate(ev.event_date)}</option>
+                  <option key={ev.year} value={ev.year}>{ev.year}</option>
                 ))}
               </select>
             </div>
