@@ -354,6 +354,64 @@ async function handleAction(sql, action, p = {}) {
       return { data: rows }
     }
 
+
+    // ── GROUPS (morning round tee sheet) ─────────────────────────
+
+    case 'get_groups': {
+      // Returns all groups for a day with their players
+      const groups = await sql`
+        SELECT eg.id, eg.group_number, eg.day,
+          json_agg(json_build_object(
+            'player_id', p.id,
+            'name', p.name
+          ) ORDER BY p.name) FILTER (WHERE p.id IS NOT NULL) as players
+        FROM event_groups eg
+        LEFT JOIN group_players gp ON gp.group_id = eg.id
+        LEFT JOIN players p ON p.id = gp.player_id
+        WHERE eg.event_id = ${p.event_id} AND eg.day = ${p.day}
+        GROUP BY eg.id, eg.group_number, eg.day
+        ORDER BY eg.group_number`
+      return { data: groups }
+    }
+
+    case 'get_player_group': {
+      // Find which group a player is in for a given day
+      const rows = await sql`
+        SELECT eg.id, eg.group_number, eg.day,
+          json_agg(json_build_object(
+            'player_id', p.id,
+            'name', p.name
+          ) ORDER BY p.name) as players
+        FROM event_groups eg
+        JOIN group_players gp ON gp.group_id = eg.id
+        JOIN players p ON p.id = gp.player_id
+        WHERE eg.event_id = ${p.event_id}
+          AND eg.day = ${p.day}
+          AND EXISTS (
+            SELECT 1 FROM group_players gp2
+            WHERE gp2.group_id = eg.id AND gp2.player_id = ${p.player_id}
+          )
+        GROUP BY eg.id, eg.group_number, eg.day
+        LIMIT 1`
+      return { data: rows[0] || null }
+    }
+
+    case 'save_groups': {
+      // Replace all groups for a day: p.groups = [{group_number, player_ids:[]}]
+      // Delete existing groups for this day
+      await sql`DELETE FROM event_groups WHERE event_id = ${p.event_id} AND day = ${p.day}`
+      for (const group of p.groups) {
+        const [grp] = await sql`
+          INSERT INTO event_groups (event_id, day, group_number)
+          VALUES (${p.event_id}, ${p.day}, ${group.group_number})
+          RETURNING id`
+        for (const pid of group.player_ids) {
+          await sql`INSERT INTO group_players (group_id, player_id) VALUES (${grp.id}, ${pid}) ON CONFLICT DO NOTHING`
+        }
+      }
+      return { data: { ok: true } }
+    }
+
     default:
       throw new Error(`Unknown action: ${action}`)
   }

@@ -21,6 +21,8 @@ export default function HomePage() {
   const { player, isCommissioner, signOutPlayer } = useAuth()
   const navigate = useNavigate()
 
+  const [playerGroup, setPlayerGroup] = useState(null)
+
   useEffect(() => { fetchEvent() }, [])
 
   const fetchEvent = async () => {
@@ -28,6 +30,16 @@ export default function HomePage() {
     try {
       const { data } = await db('get_current_event')
       setEvent(data)
+      // Load player's group if logged in
+      if (player && data) {
+        const roundInfo = getActiveRound ? getActiveRound(data.status) : null
+        const day = roundInfo?.round?.split('_')[0]
+        if (day && (day === 'friday' || day === 'saturday')) {
+          db('get_player_group', { event_id: data.id, day, player_id: player.id })
+            .then(({ data: g }) => setPlayerGroup(g))
+            .catch(() => {})
+        }
+      }
     } catch (err) {
       setDbError(err.message)
     } finally {
@@ -49,6 +61,11 @@ export default function HomePage() {
           {player ? (
             <div style={{ marginTop: 16 }}>
               <p style={{ color: 'var(--green-bright)', fontSize: '0.9rem', marginBottom: 8 }}>Welcome back, <strong>{player.name}</strong></p>
+              {playerGroup && (
+                <p style={{ color: 'var(--gold)', fontSize: '0.8rem', fontFamily: 'var(--font-mono)', marginBottom: 8 }}>
+                  Group {playerGroup.group_number} · {(playerGroup.players||[]).map(p=>p.name).join(', ')}
+                </p>
+              )}
               <button className="btn btn-ghost btn-sm" onClick={signOutPlayer}>Sign Out</button>
             </div>
           ) : !isCommissioner && (

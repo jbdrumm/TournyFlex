@@ -4,7 +4,7 @@ import { db } from '../lib/db'
 import { useAuth } from '../contexts/AuthContext'
 import { sortPlayersByScore, sortCombinedForSunday, generateScrambleTeams, calculateTotal, getCourseForRound, STATUS_FLOW, formatTime } from '../lib/golf'
 
-const TABS = ['Event', 'Players', 'Scores', 'Teams', 'Courses']
+const TABS = ['Event', 'Players', 'Groups', 'Scores', 'Teams', 'Courses']
 
 export default function CommissionerPage() {
   const { isCommissioner, signOutCommissioner } = useAuth()
@@ -40,6 +40,7 @@ export default function CommissionerPage() {
 
         {tab === 'Event'   && <EventTab />}
         {tab === 'Players' && <PlayersTab />}
+        {tab === 'Groups'  && <GroupsTab />}
         {tab === 'Scores'  && <ScoresTab />}
         {tab === 'Teams'   && <TeamsTab />}
         {tab === 'Courses' && <CoursesTab />}
@@ -555,6 +556,176 @@ function TeamsTab() {
           ))}
         </div>
       ))}
+      {toast && <div className={`toast ${toast.type}`}>{toast.msg}</div>}
+    </div>
+  )
+}
+
+
+// ─── GROUPS TAB ───────────────────────────────────────────────────────────────
+function GroupsTab() {
+  const [event, setEvent] = useState(null)
+  const [players, setPlayers] = useState([])
+  const [day, setDay] = useState('friday')
+  const [groups, setGroups] = useState([]) // [{ group_number, player_ids: [] }]
+  const [saving, setSaving] = useState(false)
+  const [toast, setToast] = useState(null)
+  const [unassigned, setUnassigned] = useState([])
+
+  useEffect(() => { fetchData() }, [])
+  useEffect(() => { if (event) loadGroups() }, [day, event])
+
+  const fetchData = async () => {
+    const [{ data: ev }, { data: ps }] = await Promise.all([db('get_current_event'), db('list_players')])
+    setEvent(ev)
+    if (ev) {
+      const { data: eps } = await db('get_event_players', { event_id: ev.id })
+      setPlayers(eps || [])
+    }
+  }
+
+  const loadGroups = async () => {
+    if (!event) return
+    const { data } = await db('get_groups', { event_id: event.id, day })
+    const loaded = (data || []).map(g => ({
+      group_number: g.group_number,
+      player_ids: (g.players || []).map(p => p.player_id),
+    }))
+    setGroups(loaded.length ? loaded : [{ group_number: 1, player_ids: [] }])
+  }
+
+  const addGroup = () => {
+    const nextNum = groups.length ? Math.max(...groups.map(g => g.group_number)) + 1 : 1
+    setGroups(g => [...g, { group_number: nextNum, player_ids: [] }])
+  }
+
+  const removeGroup = (num) => {
+    setGroups(g => g.filter(grp => grp.group_number !== num))
+  }
+
+  const togglePlayerInGroup = (groupNum, playerId) => {
+    setGroups(gs => gs.map(g => {
+      if (g.group_number !== groupNum) {
+        // Remove from any other group
+        return { ...g, player_ids: g.player_ids.filter(id => id !== playerId) }
+      }
+      const inGroup = g.player_ids.includes(playerId)
+      return { ...g, player_ids: inGroup ? g.player_ids.filter(id => id !== playerId) : [...g.player_ids, playerId] }
+    }))
+  }
+
+  const saveGroups = async () => {
+    if (!event) return
+    setSaving(true)
+    await db('save_groups', {
+      event_id: event.id, day,
+      groups: groups.filter(g => g.player_ids.length > 0)
+    })
+    setSaving(false)
+    showToast('Groups saved!', 'success')
+  }
+
+  const assignedIds = new Set(groups.flatMap(g => g.player_ids))
+  const unassignedPlayers = players.filter(p => !assignedIds.has(p.player_id))
+
+  const baseTeeTime = day === 'friday' ? event?.friday_tee_time : event?.saturday_tee_time
+
+  const calcTime = (groupNum) => {
+    if (!baseTeeTime) return null
+    const [h, m] = baseTeeTime.split(':').map(Number)
+    const total = h * 60 + m + (groupNum - 1) * 8
+    const nh = Math.floor(total / 60) % 24
+    const nm = total % 60
+    const hour = nh % 12 || 12
+    const ampm = nh >= 12 ? 'PM' : 'AM'
+    return `${hour}:${String(nm).padStart(2,'0')} ${ampm}`
+  }
+
+  const showToast = (msg, type) => { setToast({ msg, type }); setTimeout(() => setToast(null), 3000) }
+
+  return (
+    <div>
+      {/* Day selector */}
+      <div style={{ display: 'flex', gap: 4, marginBottom: 16 }}>
+        {['friday','saturday'].map(d => (
+          <button key={d} onClick={() => setDay(d)}
+            style={{ flex: 1, padding: '10px', border: 'none', borderRadius: 'var(--radius)', background: day === d ? 'var(--gold)' : 'var(--green-dark)', color: day === d ? 'var(--green-deep)' : 'var(--gray-300)', fontFamily: 'var(--font-body)', fontSize: '0.85rem', fontWeight: day === d ? 600 : 400, cursor: 'pointer', textTransform: 'capitalize' }}>
+            {d} Morning
+          </button>
+        ))}
+      </div>
+
+      {/* Unassigned players */}
+      {unassignedPlayers.length > 0 && (
+        <div className="card card-sm" style={{ marginBottom: 12, borderColor: 'rgba(214,69,69,0.4)' }}>
+          <p className="text-xs text-muted text-mono" style={{ marginBottom: 8, textTransform: 'uppercase' }}>
+            Unassigned ({unassignedPlayers.length})
+          </p>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {unassignedPlayers.map(p => (
+              <span key={p.player_id} style={{ background: 'var(--green-mid)', padding: '4px 10px', borderRadius: 100, fontSize: '0.8rem' }}>
+                {p.name}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Groups */}
+      {groups.map((group, idx) => (
+        <div key={group.group_number} className="card" style={{ marginBottom: 10 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+            <div>
+              <span style={{ fontFamily: 'var(--font-display)', fontSize: '1rem', fontWeight: 700 }}>
+                Group {group.group_number}
+              </span>
+              {calcTime(group.group_number) && (
+                <span className="text-mono text-sm" style={{ marginLeft: 10, color: 'var(--gold)' }}>
+                  {calcTime(group.group_number)}
+                </span>
+              )}
+              <span className="text-xs text-muted" style={{ marginLeft: 8 }}>
+                {group.player_ids.length}/4 players
+              </span>
+            </div>
+            <button className="btn btn-ghost btn-sm" onClick={() => removeGroup(group.group_number)}
+              style={{ color: 'var(--red)', fontSize: '0.75rem' }}>
+              Remove
+            </button>
+          </div>
+
+          {/* Player checkboxes */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+            {players.map(p => {
+              const inThisGroup = group.player_ids.includes(p.player_id)
+              const inOtherGroup = !inThisGroup && assignedIds.has(p.player_id)
+              return (
+                <button key={p.player_id} onClick={() => !inOtherGroup && togglePlayerInGroup(group.group_number, p.player_id)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px',
+                    background: inThisGroup ? 'rgba(201,168,76,0.15)' : 'var(--green-deep)',
+                    border: `1px solid ${inThisGroup ? 'var(--gold)' : 'var(--green-mid)'}`,
+                    borderRadius: 6, cursor: inOtherGroup ? 'default' : 'pointer',
+                    opacity: inOtherGroup ? 0.35 : 1,
+                  }}>
+                  <div style={{ width: 16, height: 16, borderRadius: 3, border: `2px solid ${inThisGroup ? 'var(--gold)' : 'var(--green-mid)'}`, background: inThisGroup ? 'var(--gold)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.6rem', color: 'var(--green-deep)', flexShrink: 0 }}>
+                    {inThisGroup ? '✓' : ''}
+                  </div>
+                  <span style={{ fontSize: '0.82rem', color: inThisGroup ? 'var(--gold)' : 'var(--cream)', fontWeight: inThisGroup ? 600 : 400 }}>{p.name}</span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      ))}
+
+      <button className="btn btn-secondary btn-full" onClick={addGroup} style={{ marginBottom: 12 }}>
+        + Add Group {groups.length + 1}
+      </button>
+      <button className="btn btn-primary btn-full" onClick={saveGroups} disabled={saving}>
+        {saving ? 'Saving...' : 'Save Groups'}
+      </button>
+
       {toast && <div className={`toast ${toast.type}`}>{toast.msg}</div>}
     </div>
   )
