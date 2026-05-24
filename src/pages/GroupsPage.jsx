@@ -219,21 +219,10 @@ export default function GroupsPage() {
                       )}
                     </div>
                     {(group.players || []).map(p => (
-                      <div key={p.player_id} style={{
-                        display: 'flex', alignItems: 'center', gap: 10,
-                        padding: '8px 0',
-                        borderBottom: '1px solid var(--green-mid)',
-                      }}>
-                        <span style={{
-                          width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
-                          background: player?.id === p.player_id ? 'var(--gold)' : 'var(--green-mid)',
-                        }} />
-                        <span style={{
-                          fontWeight: player?.id === p.player_id ? 700 : 400,
-                          color: player?.id === p.player_id ? 'var(--gold)' : 'var(--cream)',
-                        }}>
+                      <div key={p.player_id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                        <span style={{ width: 6, height: 6, borderRadius: '50%', flexShrink: 0, background: player?.id === p.player_id ? 'var(--gold)' : 'var(--green-mid)' }} />
+                        <span style={{ fontSize: '0.875rem', fontWeight: player?.id === p.player_id ? 600 : 400, color: player?.id === p.player_id ? 'var(--gold)' : 'var(--cream)' }}>
                           {p.name}
-                          
                         </span>
                       </div>
                     ))}
