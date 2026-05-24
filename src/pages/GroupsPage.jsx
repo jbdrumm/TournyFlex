@@ -10,13 +10,27 @@ const SCRAMBLE_ROUNDS = [
   { key: 'sunday_morning',     label: 'Sunday Scramble', day: 'sunday',   round_time: 'morning'   },
 ]
 
+// Grid layout — 3 cols x 2 rows, bottom-right cell intentionally blank
+// Row 1: Fri Singles | Sat Singles | Sun Scramble
+// Row 2: Fri Scramble | Sat Scramble | (blank)
 const TABS = [
-  { key: 'friday_am',          label: 'Fri AM',          type: 'groups',   day: 'friday'   },
-  { key: 'saturday_am',        label: 'Sat AM',          type: 'groups',   day: 'saturday' },
-  { key: 'friday_afternoon',   label: 'Fri Scramble',    type: 'scramble', day: 'friday',   round_time: 'afternoon' },
-  { key: 'saturday_afternoon', label: 'Sat Scramble',    type: 'scramble', day: 'saturday', round_time: 'afternoon' },
-  { key: 'sunday_morning',     label: 'Sun Scramble',    type: 'scramble', day: 'sunday',   round_time: 'morning'   },
+  { key: 'friday_am',          label: 'Fri Singles',  type: 'groups',   day: 'friday',   round_time: 'morning'   },
+  { key: 'saturday_am',        label: 'Sat Singles',  type: 'groups',   day: 'saturday', round_time: 'morning'   },
+  { key: 'sunday_morning',     label: 'Sun Scramble', type: 'scramble', day: 'sunday',   round_time: 'morning'   },
+  { key: 'friday_afternoon',   label: 'Fri Scramble', type: 'scramble', day: 'friday',   round_time: 'afternoon' },
+  { key: 'saturday_afternoon', label: 'Sat Scramble', type: 'scramble', day: 'saturday', round_time: 'afternoon' },
 ]
+
+// Maps event status to the default tab when the page is opened
+const STATUS_TO_TAB = {
+  upcoming:                  'friday_am',
+  friday_morning_active:     'friday_am',
+  friday_afternoon_active:   'friday_afternoon',
+  saturday_morning_active:   'saturday_am',
+  saturday_afternoon_active: 'saturday_afternoon',
+  sunday_morning_active:     'sunday_morning',
+  complete:                  'sunday_morning',
+}
 
 function calcTeeTime(baseTee, groupNumber) {
   // Group 1 = base time, each subsequent group +8 minutes
@@ -45,13 +59,9 @@ export default function GroupsPage() {
   const fetchEvent = async () => {
     const { data: ev } = await db('get_current_event')
     setEvent(ev)
-    if (ev) {
-      // Default to the active round's tab
-      const active = getActiveRound(ev.status)
-      if (active?.round) {
-        const match = TABS.find(t => t.key === active.round || (active.round.startsWith(t.day) && active.round.includes(t.type === 'groups' ? 'morning' : t.round_time || '')))
-        if (match) setActiveTab(match.key)
-      }
+    if (ev?.status) {
+      const defaultTab = STATUS_TO_TAB[ev.status] || 'friday_am'
+      setActiveTab(defaultTab)
     }
     setLoading(false)
   }
@@ -124,20 +134,36 @@ export default function GroupsPage() {
           <h1>Groups</h1>
         </div>
 
-        {/* Tab bar */}
-        <div style={{ display: 'flex', gap: 3, overflowX: 'auto', marginBottom: 16, paddingBottom: 4 }}>
-          {TABS.map(t => (
-            <button key={t.key} onClick={() => setActiveTab(t.key)}
-              style={{
-                padding: '7px 10px', border: 'none', borderRadius: 'var(--radius)',
-                background: activeTab === t.key ? 'var(--gold)' : 'var(--green-dark)',
-                color: activeTab === t.key ? 'var(--green-deep)' : 'var(--gray-300)',
-                fontFamily: 'var(--font-body)', fontSize: '0.72rem', fontWeight: activeTab === t.key ? 600 : 400,
-                cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
-              }}>
+        {/* Tab grid: 3 cols x 2 rows */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4, marginBottom: 16 }}>
+          {/* Row 1: Singles + Sunday Scramble */}
+          {TABS.slice(0, 3).map(t => (
+            <button key={t.key} onClick={() => setActiveTab(t.key)} style={{
+              padding: '9px 4px', border: 'none', borderRadius: 'var(--radius)',
+              background: activeTab === t.key ? 'var(--gold)' : 'var(--green-dark)',
+              color: activeTab === t.key ? 'var(--green-deep)' : 'var(--gray-300)',
+              fontFamily: 'var(--font-body)', fontSize: '0.7rem',
+              fontWeight: activeTab === t.key ? 600 : 400,
+              cursor: 'pointer', lineHeight: 1.3, textAlign: 'center',
+            }}>
               {t.label}
             </button>
           ))}
+          {/* Row 2: Scrambles + blank cell */}
+          {TABS.slice(3, 5).map(t => (
+            <button key={t.key} onClick={() => setActiveTab(t.key)} style={{
+              padding: '9px 4px', border: 'none', borderRadius: 'var(--radius)',
+              background: activeTab === t.key ? 'var(--gold)' : 'var(--green-dark)',
+              color: activeTab === t.key ? 'var(--green-deep)' : 'var(--gray-300)',
+              fontFamily: 'var(--font-body)', fontSize: '0.7rem',
+              fontWeight: activeTab === t.key ? 600 : 400,
+              cursor: 'pointer', lineHeight: 1.3, textAlign: 'center',
+            }}>
+              {t.label}
+            </button>
+          ))}
+          {/* Intentionally blank — no 3rd round 2 item */}
+          <div />
         </div>
 
         {loading ? (
