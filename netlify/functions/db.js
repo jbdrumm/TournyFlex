@@ -257,24 +257,21 @@ async function handleAction(sql, action, p = {}) {
         FROM round_scores rs
         JOIN players p ON p.id = rs.player_id
         WHERE rs.event_id = ${p.event_id}
-        ORDER BY rs.day, rs.round_time, rs.total_score`
+        ORDER BY rs.day, rs.round_time`
       return { data: rows }
     }
 
     case 'upsert_round_score': {
       const { event_id, player_id, course_id, day, round_time, is_scramble,
-              hole_scores, total_score, holes_completed, is_complete, scramble_team_id } = p
+              hole_scores, holes_completed, is_complete, scramble_team_id } = p
       const rows = await sql`
         INSERT INTO round_scores (event_id, player_id, course_id, day, round_time,
-          is_scramble, hole_scores, total_score, holes_completed, is_complete,
-          scramble_team_id)
+          is_scramble, hole_scores, holes_completed, is_complete, scramble_team_id)
         VALUES (${event_id}, ${player_id}, ${course_id}, ${day}, ${round_time},
           ${is_scramble || false}, ${JSON.stringify(hole_scores || {})},
-          ${total_score || 0}, ${holes_completed || 0}, ${is_complete || false},
-          ${scramble_team_id || null})
+          ${holes_completed || 0}, ${is_complete || false}, ${scramble_team_id || null})
         ON CONFLICT (event_id, player_id, course_id, day, round_time) DO UPDATE SET
           hole_scores = EXCLUDED.hole_scores,
-          total_score = EXCLUDED.total_score,
           holes_completed = EXCLUDED.holes_completed,
           is_complete = EXCLUDED.is_complete,
           scramble_team_id = EXCLUDED.scramble_team_id
@@ -335,12 +332,13 @@ async function handleAction(sql, action, p = {}) {
       for (const player_id of player_ids) {
         await sql`
           INSERT INTO round_scores (event_id, player_id, course_id, day, round_time,
-            is_scramble, score, total_score, is_complete, scramble_team_id, hole_scores, updated_at)
+            is_scramble, hole_scores, is_complete, scramble_team_id)
           VALUES (${event_id}, ${player_id}, ${course_id}, ${day}, ${round_time},
-            true, ${score}, ${score}, true, ${scramble_team_id || null}, '{}', NOW())
+            true, ${JSON.stringify({"total": score})}, true, ${scramble_team_id || null})
           ON CONFLICT (event_id, player_id, course_id, day, round_time) DO UPDATE SET
-            score = EXCLUDED.score, total_score = EXCLUDED.score,
-            is_complete = true, updated_at = NOW()`
+            hole_scores = EXCLUDED.hole_scores,
+            is_complete = true,
+            scramble_team_id = EXCLUDED.scramble_team_id`
       }
       return { data: { ok: true } }
     }
