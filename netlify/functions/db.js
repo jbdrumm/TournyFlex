@@ -512,7 +512,16 @@ async function handleAction(sql, action, p = {}) {
             AND (rs.hole_scores IS NOT NULL AND rs.hole_scores != '{}')
         ) > 0
         ORDER BY avg_score ASC NULLS LAST`
-      return { data: rows }
+      // Cast BigInt fields to Number for JSON serialization
+      return { data: rows.map(r => ({
+        ...r,
+        stroke_rounds: Number(r.stroke_rounds),
+        scramble_rounds: Number(r.scramble_rounds),
+        avg_score: r.avg_score ? parseFloat(r.avg_score) : null,
+        best_round: r.best_round ? Number(r.best_round) : null,
+        worst_round: r.worst_round ? Number(r.worst_round) : null,
+        scramble_avg: r.scramble_avg ? parseFloat(r.scramble_avg) : null,
+      })) }
     }
 
     case 'get_course_averages': {
