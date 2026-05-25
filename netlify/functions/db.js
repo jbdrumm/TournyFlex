@@ -489,13 +489,18 @@ async function handleAction(sql, action, p = {}) {
               ELSE rs.score
             END
           ) FILTER (WHERE rs.is_scramble = false AND rs.is_complete = true) as worst_round,
-          COUNT(*) FILTER (WHERE rs.is_scramble = true AND rs.is_complete = true) as scramble_rounds,
-          ROUND(AVG(rs.score::numeric) FILTER (WHERE rs.is_scramble = true AND rs.is_complete = true AND rs.score IS NOT NULL), 1) as scramble_avg
+          COUNT(*) FILTER (WHERE rs.is_scramble = true AND rs.score IS NOT NULL) as scramble_rounds,
+          ROUND(AVG(rs.score::numeric) FILTER (WHERE rs.is_scramble = true AND rs.score IS NOT NULL), 1) as scramble_avg
         FROM players p
         JOIN round_scores rs ON rs.player_id = p.id
-        WHERE rs.is_complete = true
+        WHERE (rs.is_complete = true OR rs.score IS NOT NULL)
+          AND (rs.score IS NOT NULL OR (rs.hole_scores IS NOT NULL AND rs.hole_scores != '{}'))
         GROUP BY p.id, p.name
-        HAVING COUNT(*) FILTER (WHERE rs.is_scramble = false AND rs.is_complete = true) > 0
+        HAVING COUNT(*) FILTER (
+          WHERE rs.is_scramble = false
+            AND (rs.is_complete = true OR rs.score IS NOT NULL)
+            AND (rs.score IS NOT NULL OR (rs.hole_scores IS NOT NULL AND rs.hole_scores != '{}'))
+        ) > 0
         ORDER BY avg_score ASC NULLS LAST`
       return { data: rows }
     }
@@ -525,7 +530,8 @@ async function handleAction(sql, action, p = {}) {
         JOIN players p ON p.id = rs.player_id
         JOIN courses c ON c.id = rs.course_id
         WHERE rs.is_scramble = false
-          AND rs.is_complete = true
+          AND (rs.is_complete = true OR rs.score IS NOT NULL)
+          AND (rs.score IS NOT NULL OR (rs.hole_scores IS NOT NULL AND rs.hole_scores != '{}'))
         GROUP BY p.name, c.name, c.par
         ORDER BY c.name, avg_score ASC`
       return { data: rows }

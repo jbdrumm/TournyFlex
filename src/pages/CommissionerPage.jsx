@@ -154,7 +154,7 @@ function EventTab() {
   const showToast = (msg, type) => { setToast({ msg, type }); setTimeout(() => setToast(null), 3000) }
 
   const CourseSelect = ({ label, field }) => (
-    <div className="form-group" style={{ margin: 0 }}>
+    <div className="form-group" style={{ margin: 0, gridColumn: '1 / -1' }}>
       <label>{label}</label>
       <select className="input" value={form?.[field] || ''} onChange={e => set(field, e.target.value)}>
         <option value="">Select course...</option>
@@ -163,30 +163,16 @@ function EventTab() {
     </div>
   )
 
-  const TimeInput = ({ label, field }) => {
-    const hours   = Array.from({length:12},(_,i)=>String(i+6).padStart(2,'0'))  // 06-17
-    const minutes = ['00','15','30','45']
-    const val = form?.[field] || ''
-    const [h, m] = val ? val.split(':') : ['', '']
-    const update = (newH, newM) => {
-      if (newH && newM) set(field, `${newH}:${newM}`)
-    }
-    return (
-      <div className="form-group" style={{ margin: 0 }}>
-        <label>{label}</label>
-        <div style={{ display: 'flex', gap: 4 }}>
-          <select className="input" value={h || ''} onChange={e => update(e.target.value, m || '00')} style={{ flex: 1 }}>
-            <option value="">Hr</option>
-            {hours.map(hh => <option key={hh} value={hh}>{parseInt(hh) > 12 ? parseInt(hh)-12 : parseInt(hh)} {parseInt(hh)>=12?'PM':'AM'}</option>)}
-          </select>
-          <select className="input" value={m || ''} onChange={e => update(h || '08', e.target.value)} style={{ width: 64 }}>
-            <option value="">Min</option>
-            {minutes.map(mm => <option key={mm} value={mm}>{mm}</option>)}
-          </select>
-        </div>
-      </div>
-    )
-  }
+  const TimeInput = ({ label, field }) => (
+    <div className="form-group" style={{ margin: 0 }}>
+      <label>{label}</label>
+      <input type="time" className="input"
+        value={form?.[field] || ''}
+        onChange={e => set(field, e.target.value)}
+        step="60"
+      />
+    </div>
+  )
 
   const selectedEvent = events.find(e => e.id === selectedEventId)
 
@@ -233,7 +219,17 @@ function EventTab() {
             <div style={{ marginBottom: 16 }}>
               <label style={{ display: 'block', marginBottom: 8 }}>Round Status</label>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 4 }}>
-                {STATUS_FLOW.map(s => (
+                {[
+                  { status: 'upcoming',                  label: 'Upcoming' },
+                  { status: 'friday_morning_active',     label: 'Fri Singles Live' },
+                  { status: 'friday_afternoon_active',   label: 'Fri Scramble Live' },
+                  { status: 'complete',                  label: 'Weekend Complete' },
+                  { status: 'saturday_morning_active',   label: 'Sat Singles Live' },
+                  { status: 'saturday_afternoon_active', label: 'Sat Scramble Live' },
+                  { status: null,                        label: '' },
+                  { status: 'sunday_morning_active',     label: 'Sun Scramble Live' },
+                  { status: null,                        label: '' },
+                ].map((s, i) => s.status ? (
                   <button key={s.status}
                     onClick={() => updateStatus(s.status)}
                     style={{
@@ -246,7 +242,8 @@ function EventTab() {
                     }}>
                     {s.label}
                   </button>
-                ))}
+                ) : <div key={i} />
+                )}
               </div>
             </div>
           )}
