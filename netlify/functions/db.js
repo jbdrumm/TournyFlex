@@ -472,34 +472,34 @@ async function handleAction(sql, action, p = {}) {
             CASE
               WHEN rs.hole_scores IS NOT NULL AND rs.hole_scores != '{}'
               THEN (SELECT COALESCE(SUM(value::int),0) FROM jsonb_each_text(rs.hole_scores))
-              ELSE rs.score
+              ELSE (SELECT COALESCE(SUM(value::int),0) FROM jsonb_each_text(rs.hole_scores))
             END
           ) FILTER (WHERE rs.is_scramble = false AND rs.is_complete = true), 1) as avg_score,
           MIN(
             CASE
               WHEN rs.hole_scores IS NOT NULL AND rs.hole_scores != '{}'
               THEN (SELECT COALESCE(SUM(value::int),0) FROM jsonb_each_text(rs.hole_scores))
-              ELSE rs.score
+              ELSE (SELECT COALESCE(SUM(value::int),0) FROM jsonb_each_text(rs.hole_scores))
             END
           ) FILTER (WHERE rs.is_scramble = false AND rs.is_complete = true) as best_round,
           MAX(
             CASE
               WHEN rs.hole_scores IS NOT NULL AND rs.hole_scores != '{}'
               THEN (SELECT COALESCE(SUM(value::int),0) FROM jsonb_each_text(rs.hole_scores))
-              ELSE rs.score
+              ELSE (SELECT COALESCE(SUM(value::int),0) FROM jsonb_each_text(rs.hole_scores))
             END
           ) FILTER (WHERE rs.is_scramble = false AND rs.is_complete = true) as worst_round,
-          COUNT(*) FILTER (WHERE rs.is_scramble = true AND rs.score IS NOT NULL) as scramble_rounds,
-          ROUND(AVG(rs.score::numeric) FILTER (WHERE rs.is_scramble = true AND rs.score IS NOT NULL), 1) as scramble_avg
+          COUNT(*) FILTER (WHERE rs.is_scramble = true AND rs.hole_scores IS NOT NULL AND rs.hole_scores != '{}') as scramble_rounds,
+          ROUND(AVG((SELECT COALESCE(SUM(value::int),0) FROM jsonb_each_text(rs.hole_scores))::numeric) FILTER (WHERE rs.is_scramble = true AND rs.hole_scores IS NOT NULL AND rs.hole_scores != '{}'), 1) as scramble_avg
         FROM players p
         JOIN round_scores rs ON rs.player_id = p.id
-        WHERE (rs.is_complete = true OR rs.score IS NOT NULL)
-          AND (rs.score IS NOT NULL OR (rs.hole_scores IS NOT NULL AND rs.hole_scores != '{}'))
+        WHERE (rs.is_complete = true OR (rs.hole_scores IS NOT NULL AND rs.hole_scores != '{}'))
+          AND (rs.hole_scores IS NOT NULL AND rs.hole_scores != '{}')
         GROUP BY p.id, p.name
         HAVING COUNT(*) FILTER (
           WHERE rs.is_scramble = false
-            AND (rs.is_complete = true OR rs.score IS NOT NULL)
-            AND (rs.score IS NOT NULL OR (rs.hole_scores IS NOT NULL AND rs.hole_scores != '{}'))
+            AND (rs.is_complete = true OR (rs.hole_scores IS NOT NULL AND rs.hole_scores != '{}'))
+            AND (rs.hole_scores IS NOT NULL AND rs.hole_scores != '{}')
         ) > 0
         ORDER BY avg_score ASC NULLS LAST`
       return { data: rows }
@@ -515,14 +515,14 @@ async function handleAction(sql, action, p = {}) {
             CASE
               WHEN rs.hole_scores IS NOT NULL AND rs.hole_scores != '{}'
               THEN (SELECT COALESCE(SUM(value::int),0) FROM jsonb_each_text(rs.hole_scores))
-              ELSE rs.score
+              ELSE (SELECT COALESCE(SUM(value::int),0) FROM jsonb_each_text(rs.hole_scores))
             END
           ), 1) as avg_score,
           MIN(
             CASE
               WHEN rs.hole_scores IS NOT NULL AND rs.hole_scores != '{}'
               THEN (SELECT COALESCE(SUM(value::int),0) FROM jsonb_each_text(rs.hole_scores))
-              ELSE rs.score
+              ELSE (SELECT COALESCE(SUM(value::int),0) FROM jsonb_each_text(rs.hole_scores))
             END
           ) as best,
           c.par
@@ -530,8 +530,8 @@ async function handleAction(sql, action, p = {}) {
         JOIN players p ON p.id = rs.player_id
         JOIN courses c ON c.id = rs.course_id
         WHERE rs.is_scramble = false
-          AND (rs.is_complete = true OR rs.score IS NOT NULL)
-          AND (rs.score IS NOT NULL OR (rs.hole_scores IS NOT NULL AND rs.hole_scores != '{}'))
+          AND (rs.is_complete = true OR (rs.hole_scores IS NOT NULL AND rs.hole_scores != '{}'))
+          AND (rs.hole_scores IS NOT NULL AND rs.hole_scores != '{}')
         GROUP BY p.name, c.name, c.par
         ORDER BY c.name, avg_score ASC`
       return { data: rows }
