@@ -154,28 +154,27 @@ function EventTab() {
     const newIdx = ROUND_ORDER.indexOf(status)
     const isAdvancing = newIdx > currentIdx
 
-    // Only warn when advancing to a new stroke play round
-    const strokeRoundsWithWarning = ['saturday_morning_active', 'sunday_morning_active', 'complete']
-    if (isAdvancing && strokeRoundsWithWarning.includes(status)) {
-      // Check previous round completion
-      const prevRoundMap = {
-        saturday_morning_active: { day: 'friday', rt: 'morning', label: 'Friday AM' },
-        sunday_morning_active: { day: 'saturday', rt: 'morning', label: 'Saturday AM' },
-        complete: { day: 'sunday', rt: 'morning', label: 'Sunday Scramble' },
-      }
-      const prev = prevRoundMap[status]
-      if (prev) {
-        const { data: scores } = await db('get_round_scores', { event_id: selectedEventId, day: prev.day, round_time: prev.rt })
-        const { data: players } = await db('get_players_for_event', { event_id: selectedEventId })
-        const incomplete = (players?.length || 0) - (scores?.filter(s => s.is_complete).length || 0)
-        if (incomplete > 0) {
-          const proceed = window.confirm(
-            `⚠️ ${incomplete} player${incomplete !== 1 ? 's' : ''} in ${prev.label} ${incomplete !== 1 ? 'have' : 'has'} not submitted a complete scorecard.
-
-Do you want to continue advancing the round anyway?`
-          )
-          if (!proceed) return
-        }
+    // Warn when advancing if the round that just ended has missing scores
+    const prevRoundMap = {
+      // Advancing to Sat AM → check Fri PM scramble scored
+      saturday_morning_active:   { day: 'friday',   rt: 'afternoon', label: 'Friday PM Scramble'   },
+      // Advancing to Sun Scramble → check Sat PM scramble scored
+      sunday_morning_active:     { day: 'saturday', rt: 'afternoon', label: 'Saturday PM Scramble' },
+      // Advancing to Complete → check Sun Scramble scored
+      complete:                  { day: 'sunday',   rt: 'morning',   label: 'Sunday Scramble'      },
+    }
+    const prev = isAdvancing ? prevRoundMap[status] : null
+    if (prev) {
+      const { data: scores } = await db('get_round_scores', { event_id: selectedEventId, day: prev.day, round_time: prev.rt })
+      const { data: players } = await db('get_players_for_event', { event_id: selectedEventId })
+      const totalPlayers = players?.length || 0
+      const scoredPlayers = scores?.filter(s => s.is_complete).length || 0
+      if (scoredPlayers < totalPlayers) {
+        const missing = totalPlayers - scoredPlayers
+        const proceed = window.confirm(
+          `⚠️ ${missing} player${missing !== 1 ? 's are' : ' is'} missing scores from ${prev.label}.\n\nDo you want to continue advancing the round anyway?`
+        )
+        if (!proceed) return
       }
     }
 
