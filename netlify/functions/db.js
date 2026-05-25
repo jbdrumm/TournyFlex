@@ -506,31 +506,27 @@ async function handleAction(sql, action, p = {}) {
     }
 
     case 'get_scramble_wins': {
-      // For each scramble round, find the winning team score
-      -- and credit those players with a win
+      // Find winning team per scramble round, credit those players with a win
       const rows = await sql`
-        WITH team_scores AS (
+        WITH team_totals AS (
           SELECT
             rs.event_id, rs.day, rs.round_time, rs.scramble_team_id,
-            rs.score,
-            e.year
+            (SELECT COALESCE(SUM(value::int),0) FROM jsonb_each_text(rs.hole_scores)) as total
           FROM round_scores rs
-          JOIN events e ON e.id = rs.event_id
           WHERE rs.is_scramble = true
             AND rs.scramble_team_id IS NOT NULL
-            AND rs.score IS NOT NULL
-          GROUP BY rs.event_id, rs.day, rs.round_time, rs.scramble_team_id, rs.score, e.year
+            AND rs.is_complete = true
         ),
         winners AS (
           SELECT DISTINCT ON (event_id, day, round_time)
-            event_id, day, round_time, scramble_team_id, score, year
-          FROM team_scores
-          ORDER BY event_id, day, round_time, score ASC
+            event_id, day, round_time, scramble_team_id
+          FROM team_totals
+          WHERE total > 0
+          ORDER BY event_id, day, round_time, total ASC
         )
         SELECT
           p.name as player_name,
-          COUNT(*) as scramble_wins,
-          STRING_AGG(w.year || ' ' || w.day || ' ' || w.round_time, ', ' ORDER BY w.year) as win_details
+          COUNT(*) as scramble_wins
         FROM winners w
         JOIN round_scores rs ON rs.scramble_team_id = w.scramble_team_id
           AND rs.event_id = w.event_id AND rs.day = w.day AND rs.round_time = w.round_time
