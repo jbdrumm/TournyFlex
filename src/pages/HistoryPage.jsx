@@ -175,16 +175,20 @@ function CourseTab({ courses, selectedCourse, setSelectedCourse, courseRows, cou
             const best = parseInt(p.best)
             const avgDiff = coursePar ? avg - coursePar : null
             const bestDiff = coursePar ? best - coursePar : null
+            const diffColor = (d) => d < 0 ? 'var(--blue-birdie)' : d > 0 ? 'var(--red)' : 'var(--gray-500)'
+            const diffTxt = (d) => d === 0 ? 'E' : d > 0 ? `+${d.toFixed ? d.toFixed(1) : d}` : `${d.toFixed ? d.toFixed(1) : d}`
             return (
-              <div key={p.player_name + idx} style={{ display: 'grid', gridTemplateColumns: '1fr 52px 52px 52px', alignItems: 'center', padding: '9px 12px', borderBottom: idx < sorted.length - 1 ? '1px solid var(--green-mid)' : 'none', background: idx % 2 ? 'rgba(255,255,255,0.02)' : 'transparent' }}>
+              <div key={p.player_name + idx} style={{ display: 'grid', gridTemplateColumns: '1fr 64px 56px 36px', alignItems: 'center', padding: '9px 12px', borderBottom: idx < sorted.length - 1 ? '1px solid var(--green-mid)' : 'none', background: idx % 2 ? 'rgba(255,255,255,0.02)' : 'transparent' }}>
                 <span style={{ fontWeight: 500, fontSize: '0.875rem' }}>{fmtName(p.player_name)}</span>
+                {/* Avg score + diff stacked */}
                 <div style={{ textAlign: 'right' }}>
-                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.85rem', fontWeight: 700 }}>{avg.toFixed(1)}</span>
-                  {avgDiff !== null && <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.7rem', marginLeft: 3, color: avgDiff < 0 ? 'var(--blue-birdie)' : avgDiff > 0 ? 'var(--red)' : 'var(--gray-500)' }}>({avgDiff > 0 ? '+' : ''}{avgDiff.toFixed(1)})</span>}
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.9rem', fontWeight: 700 }}>{avg.toFixed(1)}</div>
+                  {avgDiff !== null && <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.68rem', color: diffColor(avgDiff) }}>{diffTxt(avgDiff)}</div>}
                 </div>
+                {/* Best score + diff stacked */}
                 <div style={{ textAlign: 'right' }}>
-                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.85rem', color: 'var(--blue-birdie)' }}>{best}</span>
-                  {bestDiff !== null && <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.7rem', marginLeft: 3, color: bestDiff < 0 ? 'var(--blue-birdie)' : bestDiff > 0 ? 'var(--red)' : 'var(--gray-500)' }}>({bestDiff > 0 ? '+' : ''}{bestDiff})</span>}
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.9rem', color: 'var(--blue-birdie)' }}>{best}</div>
+                  {bestDiff !== null && <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.68rem', color: diffColor(bestDiff) }}>{diffTxt(bestDiff)}</div>}
                 </div>
                 <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.8rem', textAlign: 'right', color: 'var(--gray-400)' }}>{p.rounds}</span>
               </div>
