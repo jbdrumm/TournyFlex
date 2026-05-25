@@ -1,62 +1,48 @@
 -- ================================================================
--- MANISTEE GOLF & COUNTRY CLUB
--- 500 Cherry St, Manistee MI 49660 — On Lake Michigan bluffs
--- Par 71 (front 36, back 35), Rating 69.0, Slope 128
--- 5,806 yards from white tees
--- NOTE: hole-by-hole data estimated — send scorecard photo to confirm
+-- MANISTEE GOLF & COUNTRY CLUB — FULLY CONFIRMED
+-- Source: GolfNow actual scorecard screenshot
+-- Par 70 (front 34, back 36), Rating 69.0, Slope 128
+-- White tees 5,587 yards
 -- ================================================================
 
--- Add the course
 INSERT INTO courses (name, city, state, par, slope_rating, course_rating)
-VALUES ('Manistee Golf & Country Club', 'Manistee', 'MI', 71, 128, 69.0)
-ON CONFLICT (name) DO NOTHING;
+VALUES ('Manistee Golf & Country Club', 'Manistee', 'MI', 70, 128, 69.0)
+ON CONFLICT (name) DO UPDATE SET par=70, slope_rating=128, course_rating=69.0;
 
--- Hole data: par confirmed from course website description
--- Front 9 par 36, Back 9 par 35 (par 71 total)
--- Handicaps ESTIMATED — needs scorecard photo to confirm
--- Yardages estimated from total 5,806 white yards and course descriptions
--- (holes 3,4,12,13,14,15 are on bluff overlooking Lake Michigan)
--- Hole 10 is the longest at 533 yards from back (par 5)
 WITH course AS (SELECT id FROM courses WHERE name = 'Manistee Golf & Country Club')
-INSERT INTO course_holes (course_id, hole_number, par, handicap_rank, yardage_white)
-SELECT course.id, h.hole_number, h.par, h.handicap_rank, h.yardage_white
+INSERT INTO course_holes (course_id, hole_number, par, handicap_rank,
+  yardage_white, yardage_red)
+SELECT course.id, h.hole_number, h.par, h.handicap_rank, h.white, h.red
 FROM course, (VALUES
--- Hole  Par  Hdcp(est)  White(est)
-  (1,  4,  7, 340),
-  (2,  4, 13, 310),
-  (3,  4,  3, 370),  -- bluff hole, dogleg right
-  (4,  4,  1, 390),  -- bluff hole, water hazard
-  (5,  3, 17, 160),
-  (6,  5, 11, 480),
-  (7,  4,  5, 350),  -- OB inside fence
-  (8,  4,  9, 330),  -- OB inside fence
-  (9,  4, 15, 274),  -- OB inside fence
-  (10, 5,  2, 490),  -- longest hole, 533 from back
-  (11, 4,  6, 380),
-  (12, 4,  4, 360),  -- bluff hole, water hazard
-  (13, 4, 10, 330),  -- bluff hole, water hazard
-  (14, 4, 14, 310),  -- bluff hole, water hazard
-  (15, 4, 16, 290),  -- bluff hole
-  (16, 3, 18, 160),  -- water hazard
-  (17, 4,  8, 320),
-  (18, 3, 12, 118)
-) AS h(hole_number, par, handicap_rank, yardage_white)
+-- Hole  Par  Hdcp  White  Red
+  (1,  4,  1, 408, 318),
+  (2,  4,  7, 354, 273),
+  (3,  4,  3, 351, 304),
+  (4,  4, 15, 312, 268),
+  (5,  4,  5, 354, 279),
+  (6,  3, 11, 183, 126),
+  (7,  4,  9, 324, 314),
+  (8,  4, 13, 301, 293),
+  (9,  3, 17, 119, 110),
+  (10, 5,  2, 528, 464),
+  (11, 3, 18, 160, 148),
+  (12, 5,  6, 457, 407),
+  (13, 4, 16, 304, 255),
+  (14, 3, 12, 170, 158),
+  (15, 4, 10, 301, 253),
+  (16, 4, 14, 282, 276),
+  (17, 4,  8, 304, 240),
+  (18, 4,  4, 375, 303)
+) AS h(hole_number, par, handicap_rank, white, red)
 ON CONFLICT (course_id, hole_number) DO UPDATE SET
-  par = EXCLUDED.par,
-  handicap_rank = EXCLUDED.handicap_rank,
-  yardage_white = EXCLUDED.yardage_white;
+  par=EXCLUDED.par, handicap_rank=EXCLUDED.handicap_rank,
+  yardage_white=EXCLUDED.yardage_white, yardage_red=EXCLUDED.yardage_red;
 
--- ================================================================
--- UPDATE 2025 EVENT: link Sat AM and Sat PM to Manistee G&CC
--- (Fri AM/PM stays as Hemlock, Sun stays as Stonegate)
--- ================================================================
+-- Update 2025 event and round scores to use this course for Saturday
 UPDATE events SET
   saturday_course_id = (SELECT id FROM courses WHERE name = 'Manistee Golf & Country Club')
 WHERE year = 2025;
 
--- ================================================================
--- UPDATE 2025 ROUND SCORES: relink saturday morning rounds to new course
--- ================================================================
 UPDATE round_scores SET
   course_id = (SELECT id FROM courses WHERE name = 'Manistee Golf & Country Club')
 WHERE event_id = (SELECT id FROM events WHERE year = 2025)

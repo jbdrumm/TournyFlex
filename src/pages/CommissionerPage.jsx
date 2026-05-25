@@ -142,6 +142,43 @@ function EventTab() {
 
   const updateStatus = async (status) => {
     if (!selectedEventId) return
+
+    // Check if advancing to a new round while previous has incomplete scores
+    const ROUND_ORDER = [
+      'upcoming',
+      'friday_morning_active', 'friday_afternoon_active',
+      'saturday_morning_active', 'saturday_afternoon_active',
+      'sunday_morning_active', 'complete'
+    ]
+    const currentIdx = ROUND_ORDER.indexOf(form.status)
+    const newIdx = ROUND_ORDER.indexOf(status)
+    const isAdvancing = newIdx > currentIdx
+
+    // Only warn when advancing to a new stroke play round
+    const strokeRoundsWithWarning = ['saturday_morning_active', 'sunday_morning_active', 'complete']
+    if (isAdvancing && strokeRoundsWithWarning.includes(status)) {
+      // Check previous round completion
+      const prevRoundMap = {
+        saturday_morning_active: { day: 'friday', rt: 'morning', label: 'Friday AM' },
+        sunday_morning_active: { day: 'saturday', rt: 'morning', label: 'Saturday AM' },
+        complete: { day: 'sunday', rt: 'morning', label: 'Sunday Scramble' },
+      }
+      const prev = prevRoundMap[status]
+      if (prev) {
+        const { data: scores } = await db('get_round_scores', { event_id: selectedEventId, day: prev.day, round_time: prev.rt })
+        const { data: players } = await db('get_players_for_event', { event_id: selectedEventId })
+        const incomplete = (players?.length || 0) - (scores?.filter(s => s.is_complete).length || 0)
+        if (incomplete > 0) {
+          const proceed = window.confirm(
+            `⚠️ ${incomplete} player${incomplete !== 1 ? 's' : ''} in ${prev.label} ${incomplete !== 1 ? 'have' : 'has'} not submitted a complete scorecard.
+
+Do you want to continue advancing the round anyway?`
+          )
+          if (!proceed) return
+        }
+      }
+    }
+
     await db('update_event_status', {
       id: selectedEventId, status,
       active_round: STATUS_FLOW.find(s => s.status === status)?.round || null
