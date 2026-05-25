@@ -461,39 +461,65 @@ async function handleAction(sql, action, p = {}) {
 
 
     case 'get_player_career_stats': {
-      // Career stats for all players: avg score, rounds, best/worst, scramble stats
-      // Only count stroke play (friday/saturday morning) rounds
-      // Exclude 2022 Fri PM (known data gap) — handled by is_scramble=false filter
+      // Career stats — historical data stored as single 'score' integer (no hole_scores)
+      // Current scoring stores hole_scores JSONB. Handle both.
       const rows = await sql`
         SELECT
           p.id as player_id,
           p.name,
           COUNT(*) FILTER (WHERE rs.is_scramble = false AND rs.is_complete = true) as stroke_rounds,
-          ROUND(AVG((SELECT COALESCE(SUM(value::int),0) FROM jsonb_each_text(rs.hole_scores)))
-            FILTER (WHERE rs.is_scramble = false AND rs.is_complete = true), 2) as avg_score,
-          MIN((SELECT COALESCE(SUM(value::int),0) FROM jsonb_each_text(rs.hole_scores)))
-            FILTER (WHERE rs.is_scramble = false AND rs.is_complete = true) as best_round,
-          MAX((SELECT COALESCE(SUM(value::int),0) FROM jsonb_each_text(rs.hole_scores)))
-            FILTER (WHERE rs.is_scramble = false AND rs.is_complete = true) as worst_round,
+          ROUND(AVG(
+            CASE
+              WHEN rs.hole_scores IS NOT NULL AND rs.hole_scores != '{}'
+              THEN (SELECT COALESCE(SUM(value::int),0) FROM jsonb_each_text(rs.hole_scores))
+              ELSE rs.score
+            END
+          ) FILTER (WHERE rs.is_scramble = false AND rs.is_complete = true), 1) as avg_score,
+          MIN(
+            CASE
+              WHEN rs.hole_scores IS NOT NULL AND rs.hole_scores != '{}'
+              THEN (SELECT COALESCE(SUM(value::int),0) FROM jsonb_each_text(rs.hole_scores))
+              ELSE rs.score
+            END
+          ) FILTER (WHERE rs.is_scramble = false AND rs.is_complete = true) as best_round,
+          MAX(
+            CASE
+              WHEN rs.hole_scores IS NOT NULL AND rs.hole_scores != '{}'
+              THEN (SELECT COALESCE(SUM(value::int),0) FROM jsonb_each_text(rs.hole_scores))
+              ELSE rs.score
+            END
+          ) FILTER (WHERE rs.is_scramble = false AND rs.is_complete = true) as worst_round,
           COUNT(*) FILTER (WHERE rs.is_scramble = true AND rs.is_complete = true) as scramble_rounds,
-          ROUND(AVG(rs.score::numeric) FILTER (WHERE rs.is_scramble = true AND rs.is_complete = true), 1) as scramble_avg
+          ROUND(AVG(rs.score::numeric) FILTER (WHERE rs.is_scramble = true AND rs.is_complete = true AND rs.score IS NOT NULL), 1) as scramble_avg
         FROM players p
         JOIN round_scores rs ON rs.player_id = p.id
         WHERE rs.is_complete = true
         GROUP BY p.id, p.name
+        HAVING COUNT(*) FILTER (WHERE rs.is_scramble = false AND rs.is_complete = true) > 0
         ORDER BY avg_score ASC NULLS LAST`
       return { data: rows }
     }
 
     case 'get_course_averages': {
-      // Average score per player per course (stroke play only)
       const rows = await sql`
         SELECT
           p.name as player_name,
           c.name as course_name,
           COUNT(*) as rounds,
-          ROUND(AVG((SELECT COALESCE(SUM(value::int),0) FROM jsonb_each_text(rs.hole_scores))), 2) as avg_score,
-          MIN((SELECT COALESCE(SUM(value::int),0) FROM jsonb_each_text(rs.hole_scores))) as best,
+          ROUND(AVG(
+            CASE
+              WHEN rs.hole_scores IS NOT NULL AND rs.hole_scores != '{}'
+              THEN (SELECT COALESCE(SUM(value::int),0) FROM jsonb_each_text(rs.hole_scores))
+              ELSE rs.score
+            END
+          ), 1) as avg_score,
+          MIN(
+            CASE
+              WHEN rs.hole_scores IS NOT NULL AND rs.hole_scores != '{}'
+              THEN (SELECT COALESCE(SUM(value::int),0) FROM jsonb_each_text(rs.hole_scores))
+              ELSE rs.score
+            END
+          ) as best,
           c.par
         FROM round_scores rs
         JOIN players p ON p.id = rs.player_id

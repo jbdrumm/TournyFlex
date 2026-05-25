@@ -78,7 +78,7 @@ export default function ScorecardPage() {
   const adjustScore = (playerId, holeNum, delta) => {
     if (!scoringFor[playerId]) return
     setScores(s => {
-      const current = s[playerId]?.[String(holeNum)] ?? 4
+      const current = s[playerId]?.[String(holeNum)] ?? holePar
       const next = Math.max(1, Math.min(15, current + delta))
       return { ...s, [playerId]: { ...s[playerId], [String(holeNum)]: next } }
     })
@@ -117,7 +117,7 @@ export default function ScorecardPage() {
     groupPlayers.forEach(member => {
       const existing = scores[member.player_id] || {}
       if (scoringFor[member.player_id]) {
-        const holeVal = existing[String(currentHole)] ?? 4
+        const holeVal = existing[String(currentHole)] ?? holePar
         committed[member.player_id] = { ...existing, [String(currentHole)]: holeVal }
       } else {
         committed[member.player_id] = existing
@@ -166,12 +166,23 @@ export default function ScorecardPage() {
     </div></div>
   )
 
-  if (!event || !isStrokePlay) return (
+  if (!event) return (
     <div className="page"><div className="container" style={{ textAlign: 'center', paddingTop: 60 }}>
       <p style={{ fontSize: '2rem', marginBottom: 16 }}>⛳</p>
-      <p className="text-muted">
-        {!event ? 'No active event.' : roundInfo?.round?.includes('afternoon') ? 'Scramble — enter team score via the Groups tab.' : 'No stroke play round active.'}
-      </p>
+      <p className="text-muted">No active event.</p>
+    </div></div>
+  )
+
+  // Afternoon scramble — show team score entry
+  const isScramble = roundInfo?.round?.includes('afternoon') || roundInfo?.round === 'sunday_morning'
+  if (isScramble && player) {
+    return <ScrambleScoreEntry event={event} roundInfo={roundInfo} player={player} />
+  }
+
+  if (!isStrokePlay) return (
+    <div className="page"><div className="container" style={{ textAlign: 'center', paddingTop: 60 }}>
+      <p style={{ fontSize: '2rem', marginBottom: 16 }}>⛳</p>
+      <p className="text-muted">No active round.</p>
     </div></div>
   )
 
@@ -258,7 +269,7 @@ export default function ScorecardPage() {
             {groupPlayers.map((member, idx) => {
               const isMe = player?.id === member.player_id
               const isScoring = scoringFor[member.player_id]
-              const holeScore = scores[member.player_id]?.[String(currentHole)] ?? 4
+              const holeScore = scores[member.player_id]?.[String(currentHole)] ?? holePar
               const diff = holeScore - holePar
               const diffTxt = diff === 0 ? 'E' : diff > 0 ? `+${diff}` : `${diff}`
               const diffColor = diff < 0 ? 'var(--blue-birdie)' : diff > 0 ? 'var(--red)' : 'var(--gray-500)'
@@ -339,6 +350,123 @@ export default function ScorecardPage() {
                 </div>
               )
             })}
+          </div>
+        )}
+      </div>
+      {toast && <div className={`toast ${toast.type}`}>{toast.msg}</div>}
+    </div>
+  )
+}
+
+// ── SCRAMBLE SCORE ENTRY ─────────────────────────────────────────────────────
+function ScrambleScoreEntry({ event, roundInfo, player }) {
+  const [team, setTeam] = useState(null)
+  const [score, setScore] = useState(null)
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const [toast, setToast] = useState(null)
+
+  const day = roundInfo?.round?.split('_')[0]
+  const round_time = roundInfo?.round?.includes('afternoon') ? 'afternoon' : 'morning'
+
+  useEffect(() => { fetchTeam() }, [player, event])
+
+  const fetchTeam = async () => {
+    if (!player || !event) return
+    const { data: group } = await db('get_player_group', {
+      event_id: event.id, day, player_id: player.id
+    })
+    if (!group) return
+
+    // Find scramble team for this player
+    const { data: teams } = await db('get_scramble_teams', {
+      event_id: event.id,
+      round: roundInfo?.round
+    })
+    if (!teams?.length) return
+
+    const myTeam = teams.find(t => {
+      const pids = typeof t.player_ids === 'string' ? JSON.parse(t.player_ids) : t.player_ids
+      return pids.includes(player.id)
+    })
+    if (!myTeam) return
+
+    // Enrich team with player names from event_players
+    const { data: eventPlayers } = await db('get_players_for_event', { event_id: event.id })
+    const nameMap = {}
+    eventPlayers?.forEach(ep => { nameMap[ep.player_id] = ep.name })
+    const pids = typeof myTeam.player_ids === 'string' ? JSON.parse(myTeam.player_ids) : myTeam.player_ids
+    setTeam({ ...myTeam, member_names: pids.map(pid => nameMap[pid] || pid) })
+
+    // Load existing score
+    const { data: sc } = await db('get_player_round', {
+      event_id: event.id, player_id: player.id, day, round_time
+    })
+    if (sc?.score != null) setScore(sc.score)
+  }
+
+  const handleSave = async () => {
+    if (score === null || !team || !event) return
+    setSaving(true)
+    const pids = typeof team.player_ids === 'string' ? JSON.parse(team.player_ids) : team.player_ids
+    const courseId = day === 'friday' ? event.friday_course_id : day === 'saturday' ? event.saturday_course_id : event.sunday_course_id
+    await db('save_scramble_score', {
+      event_id: event.id, course_id: courseId,
+      day, round_time, player_ids: pids, score
+    })
+    setSaving(false)
+    setSaved(true)
+    setToast({ msg: 'Team score saved! ✓', type: 'success' })
+    setTimeout(() => setToast(null), 3000)
+  }
+
+  const pids = team ? (typeof team.player_ids === 'string' ? JSON.parse(team.player_ids) : team.player_ids) : []
+
+  return (
+    <div className="page">
+      <div className="container">
+        <div style={{ paddingTop: 20, paddingBottom: 12, borderBottom: '1px solid var(--green-mid)', marginBottom: 16 }}>
+          <p style={{ fontFamily: 'var(--font-mono)', fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--gold)', marginBottom: 2 }}>{roundInfo?.label}</p>
+          <h1 style={{ fontSize: '1.6rem' }}>Scramble Score</h1>
+        </div>
+
+        {!team ? (
+          <div className="card" style={{ textAlign: 'center', padding: 40 }}>
+            <p style={{ fontSize: '2rem', marginBottom: 8 }}>⏳</p>
+            <p className="text-muted">No scramble team assigned yet.</p>
+            <p className="text-xs text-muted" style={{ marginTop: 8 }}>Check the Groups tab for your team.</p>
+          </div>
+        ) : (
+          <div className="card">
+            <p className="text-xs text-muted text-mono" style={{ marginBottom: 10, textTransform: 'uppercase' }}>
+              Team {team.team_number}
+            </p>
+
+            {/* Team member list — single compact line */}
+            <div style={{ marginBottom: 20, padding: '10px 12px', background: 'var(--green-deep)', borderRadius: 'var(--radius)', lineHeight: 1.6 }}>
+              {(team.member_names || []).map((name, i) => (
+                <span key={i} style={{ fontSize: '0.875rem', color: name === player.name ? 'var(--gold)' : 'var(--cream)', fontWeight: name === player.name ? 600 : 400 }}>
+                  {i > 0 && <span style={{ color: 'var(--gray-500)', margin: '0 6px' }}>·</span>}
+                  {name}
+                </span>
+              ))}
+            </div>
+
+            <p className="text-xs text-muted text-mono" style={{ marginBottom: 12, textTransform: 'uppercase' }}>Team Score (over/under par)</p>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 20, marginBottom: 24 }}>
+              <button onClick={() => setScore(s => (s ?? 0) - 1)}
+                style={{ width: 52, height: 52, border: '1px solid var(--green-mid)', borderRadius: 'var(--radius)', background: 'var(--green-deep)', color: 'var(--cream)', fontSize: '1.6rem', cursor: 'pointer' }}>−</button>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: '2.2rem', fontWeight: 700, minWidth: 60, textAlign: 'center',
+                color: score === null ? 'var(--gray-500)' : score < 0 ? 'var(--blue-birdie)' : score > 0 ? 'var(--red)' : 'var(--cream)' }}>
+                {score === null ? '–' : score > 0 ? `+${score}` : score}
+              </span>
+              <button onClick={() => setScore(s => (s ?? 0) + 1)}
+                style={{ width: 52, height: 52, border: '1px solid var(--green-mid)', borderRadius: 'var(--radius)', background: 'var(--green-deep)', color: 'var(--cream)', fontSize: '1.6rem', cursor: 'pointer' }}>+</button>
+            </div>
+
+            <button className="btn btn-primary btn-full" onClick={handleSave} disabled={saving || score === null}>
+              {saving ? 'Saving...' : saved ? 'Score Saved ✓' : 'Save Team Score'}
+            </button>
           </div>
         )}
       </div>

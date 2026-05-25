@@ -89,6 +89,8 @@ function EventTab() {
     if (current) loadEvent(current, evs || [])
   }
 
+  const stripSeconds = (t) => t ? String(t).slice(0, 5) : ''
+
   const loadEvent = (ev, evList) => {
     setCreating(false)
     setSelectedEventId(ev.id)
@@ -161,12 +163,30 @@ function EventTab() {
     </div>
   )
 
-  const TimeInput = ({ label, field }) => (
-    <div className="form-group" style={{ margin: 0 }}>
-      <label>{label}</label>
-      <input type="time" className="input" value={form?.[field] || ''} onChange={e => set(field, e.target.value)} />
-    </div>
-  )
+  const TimeInput = ({ label, field }) => {
+    const hours   = Array.from({length:12},(_,i)=>String(i+6).padStart(2,'0'))  // 06-17
+    const minutes = ['00','15','30','45']
+    const val = form?.[field] || ''
+    const [h, m] = val ? val.split(':') : ['', '']
+    const update = (newH, newM) => {
+      if (newH && newM) set(field, `${newH}:${newM}`)
+    }
+    return (
+      <div className="form-group" style={{ margin: 0 }}>
+        <label>{label}</label>
+        <div style={{ display: 'flex', gap: 4 }}>
+          <select className="input" value={h || ''} onChange={e => update(e.target.value, m || '00')} style={{ flex: 1 }}>
+            <option value="">Hr</option>
+            {hours.map(hh => <option key={hh} value={hh}>{parseInt(hh) > 12 ? parseInt(hh)-12 : parseInt(hh)} {parseInt(hh)>=12?'PM':'AM'}</option>)}
+          </select>
+          <select className="input" value={m || ''} onChange={e => update(h || '08', e.target.value)} style={{ width: 64 }}>
+            <option value="">Min</option>
+            {minutes.map(mm => <option key={mm} value={mm}>{mm}</option>)}
+          </select>
+        </div>
+      </div>
+    )
+  }
 
   const selectedEvent = events.find(e => e.id === selectedEventId)
 
