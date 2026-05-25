@@ -154,16 +154,22 @@ function EventTab() {
     const newIdx = ROUND_ORDER.indexOf(status)
     const isAdvancing = newIdx > currentIdx
 
-    // Warn when advancing if the round that just ended has missing scores
-    const prevRoundMap = {
-      // Advancing to Sat AM → check Fri PM scramble scored
-      saturday_morning_active:   { day: 'friday',   rt: 'afternoon', label: 'Friday PM Scramble'   },
-      // Advancing to Sun Scramble → check Sat PM scramble scored
-      sunday_morning_active:     { day: 'saturday', rt: 'afternoon', label: 'Saturday PM Scramble' },
-      // Advancing to Complete → check Sun Scramble scored
-      complete:                  { day: 'sunday',   rt: 'morning',   label: 'Sunday Scramble'      },
+    // Correct validation + team generation map:
+    // Fri PM Scramble Live  → check Fri AM stroke play complete  → offer generate Fri PM teams
+    // Sat AM Live           → check Fri PM scramble complete     → (no team gen)
+    // Sat PM Scramble Live  → check Sat AM stroke play complete  → offer generate Sat PM teams
+    // Sun Scramble Live     → check Sat PM scramble complete     → offer generate Sun teams
+    // Complete              → check Sun scramble complete        → (no team gen)
+
+    const roundValidation = {
+      friday_afternoon_active:   { day: 'friday',   rt: 'morning',   label: 'Friday AM singles'      },
+      saturday_morning_active:   { day: 'friday',   rt: 'afternoon', label: 'Friday PM scramble'     },
+      saturday_afternoon_active: { day: 'saturday', rt: 'morning',   label: 'Saturday AM singles'    },
+      sunday_morning_active:     { day: 'saturday', rt: 'afternoon', label: 'Saturday PM scramble'   },
+      complete:                  { day: 'sunday',   rt: 'morning',   label: 'Sunday scramble'        },
     }
-    const prev = isAdvancing ? prevRoundMap[status] : null
+
+    const prev = isAdvancing ? roundValidation[status] : null
     if (prev) {
       const { data: scores } = await db('get_round_scores', { event_id: selectedEventId, day: prev.day, round_time: prev.rt })
       const { data: players } = await db('get_players_for_event', { event_id: selectedEventId })
@@ -172,11 +178,12 @@ function EventTab() {
       if (scoredPlayers < totalPlayers) {
         const missing = totalPlayers - scoredPlayers
         const proceed = window.confirm(
-          `⚠️ ${missing} player${missing !== 1 ? 's are' : ' is'} missing scores from ${prev.label}.\n\nDo you want to continue advancing the round anyway?`
+          `⚠️ ${missing} player${missing !== 1 ? 's are' : ' is'} missing scores from ${prev.label}.\n\nContinue advancing the round anyway?`
         )
         if (!proceed) return
       }
     }
+
 
     await db('update_event_status', {
       id: selectedEventId, status,

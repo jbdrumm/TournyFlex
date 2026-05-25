@@ -57,10 +57,16 @@ export default function GroupsPage() {
   useEffect(() => { if (event) fetchTabData() }, [activeTab, event])
 
   const fetchEvent = async () => {
-    const { data: ev } = await db('get_current_event')
+    let { data: ev } = await db('get_current_event')
+    // If no active event, fall back to most recent completed event
+    // so groups stay visible after Complete is marked
+    if (!ev) {
+      const { data: events } = await db('list_events')
+      ev = events?.[0] || null  // list_events is DESC by date, first = most recent
+    }
     setEvent(ev)
     if (ev?.status) {
-      const defaultTab = STATUS_TO_TAB[ev.status] || 'friday_am'
+      const defaultTab = STATUS_TO_TAB[ev.status] || 'sunday_morning'
       setActiveTab(defaultTab)
     }
     setLoading(false)
