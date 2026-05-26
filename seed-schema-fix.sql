@@ -1,55 +1,40 @@
 -- ================================================================
 -- HISTORICAL DATA BACKFILL (2021-2025)
--- Normalize all historical round_scores to clean schema:
---   hole_scores     = {} (no per-hole data available)
---   holes_completed = 18
---   is_complete     = true
---   total_score     = gross strokes
---   score_vs_par    = strokes vs par
 -- ================================================================
 
--- STROKE PLAY (is_scramble = false)
--- spreadsheet value is gross score (e.g. 94)
--- total_score = 94, score_vs_par = 94 - course_par
-UPDATE round_scores rs
+-- STROKE PLAY: total_score = gross, score_vs_par = gross - course_par
+UPDATE round_scores
 SET
   hole_scores     = '{}',
   holes_completed = 18,
   is_complete     = true,
-  total_score     = (rs.hole_scores->>'total')::int,
-  score_vs_par    = (rs.hole_scores->>'total')::int - c.par
-FROM courses c
-JOIN events e ON e.id = rs.event_id
-WHERE rs.course_id = c.id
-  AND rs.is_scramble = false
-  AND e.year BETWEEN 2021 AND 2025
-  AND rs.hole_scores ? 'total';
+  total_score     = (hole_scores->>'total')::int,
+  score_vs_par    = (hole_scores->>'total')::int - (
+    SELECT c.par FROM courses c WHERE c.id = round_scores.course_id
+  )
+WHERE is_scramble = false
+  AND event_id IN (SELECT id FROM events WHERE year BETWEEN 2021 AND 2025)
+  AND hole_scores ? 'total';
 
--- SCRAMBLE (is_scramble = true)
--- spreadsheet value is already +/- par (e.g. -5)
--- score_vs_par = -5, total_score = -5 + course_par
-UPDATE round_scores rs
+-- SCRAMBLE: score_vs_par = spreadsheet value, total_score = value + course_par
+UPDATE round_scores
 SET
   hole_scores     = '{}',
   holes_completed = 18,
   is_complete     = true,
-  score_vs_par    = (rs.hole_scores->>'total')::int,
-  total_score     = (rs.hole_scores->>'total')::int + c.par
-FROM courses c
-JOIN events e ON e.id = rs.event_id
-WHERE rs.course_id = c.id
-  AND rs.is_scramble = true
-  AND e.year BETWEEN 2021 AND 2025
-  AND rs.hole_scores ? 'total';
+  score_vs_par    = (hole_scores->>'total')::int,
+  total_score     = (hole_scores->>'total')::int + (
+    SELECT c.par FROM courses c WHERE c.id = round_scores.course_id
+  )
+WHERE is_scramble = true
+  AND event_id IN (SELECT id FROM events WHERE year BETWEEN 2021 AND 2025)
+  AND hole_scores ? 'total';
 
--- Also clear out any 2026 test scramble scores that are still in {total:N} format
--- (these were saved before hole-by-hole scoring was fixed)
-DELETE FROM round_scores rs
-USING events e
-WHERE rs.event_id = e.id
-  AND e.year = 2026
-  AND rs.is_scramble = true
-  AND rs.hole_scores ? 'total';
+-- DELETE 2026 test scramble scores still in {total:N} format
+DELETE FROM round_scores
+WHERE is_scramble = true
+  AND event_id IN (SELECT id FROM events WHERE year = 2026)
+  AND hole_scores ? 'total';
 
 -- Verify
 SELECT
