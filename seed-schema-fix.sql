@@ -1,101 +1,68 @@
 -- ================================================================
--- SCHEMA FIX: Add total_score and score_vs_par columns
--- Separate hole_scores (raw), total (gross), and vs_par (differential)
+-- HISTORICAL DATA BACKFILL (2021-2025)
+-- Normalize all historical round_scores to clean schema:
+--   hole_scores     = {} (no per-hole data available)
+--   holes_completed = 18
+--   is_complete     = true
+--   total_score     = gross strokes
+--   score_vs_par    = strokes vs par
 -- ================================================================
 
--- Add new columns if they don't exist
-ALTER TABLE round_scores ADD COLUMN IF NOT EXISTS total_score integer;
-ALTER TABLE round_scores ADD COLUMN IF NOT EXISTS score_vs_par integer;
-
--- ── BACKFILL FROM EXISTING DATA ──────────────────────────────────
-
--- 1. Records with per-hole data {"1":4,"2":5,...}
---    total_score = sum of all hole values
---    holes_completed = count of hole keys
---    score_vs_par = needs course holes to calculate (done separately)
-UPDATE round_scores rs SET
-  total_score = (
-    SELECT SUM(value::int) FROM jsonb_each_text(rs.hole_scores)
-    WHERE key ~ '^[0-9]+$'
-  ),
-  holes_completed = (
-    SELECT COUNT(*) FROM jsonb_each_text(rs.hole_scores)
-    WHERE key ~ '^[0-9]+$'
-  )
-WHERE hole_scores IS NOT NULL
-  AND hole_scores ? '1';  -- has per-hole format
-
--- 2. Records with {"total": N} where is_scramble = true
---    score_vs_par = the total value (already +/-)
---    total_score = NULL (no gross data available historically)
---    holes_completed = 18 (they played a full round)
-UPDATE round_scores SET
-  score_vs_par = (hole_scores->>'total')::int,
-  holes_completed = 18
-WHERE hole_scores ? 'total'
-  AND is_scramble = true;
-
--- 3. Records with {"total": N} where is_scramble = false (stroke play historical)
---    total_score = the total value (gross score)
---    holes_completed = 18
-UPDATE round_scores SET
-  total_score = (hole_scores->>'total')::int,
-  holes_completed = 18
-WHERE hole_scores ? 'total'
-  AND is_scramble = false;
-
--- 4. Backfill score_vs_par for per-hole stroke play records where course is known
-UPDATE round_scores rs SET
-  score_vs_par = (
-    SELECT SUM(
-      (rs.hole_scores->>ch.hole_number::text)::int - ch.par
-    )
-    FROM course_holes ch
-    WHERE ch.course_id = rs.course_id
-      AND rs.hole_scores ? ch.hole_number::text
-  )
-WHERE rs.hole_scores ? '1'
+-- STROKE PLAY (is_scramble = false)
+-- spreadsheet value is gross score (e.g. 94)
+-- total_score = 94, score_vs_par = 94 - course_par
+UPDATE round_scores rs
+SET
+  hole_scores     = '{}',
+  holes_completed = 18,
+  is_complete     = true,
+  total_score     = (rs.hole_scores->>'total')::int,
+  score_vs_par    = (rs.hole_scores->>'total')::int - c.par
+FROM courses c
+JOIN events e ON e.id = rs.event_id
+WHERE rs.course_id = c.id
   AND rs.is_scramble = false
-  AND rs.course_id IS NOT NULL
-  AND rs.holes_completed = 18;
+  AND e.year BETWEEN 2021 AND 2025
+  AND rs.hole_scores ? 'total';
+
+-- SCRAMBLE (is_scramble = true)
+-- spreadsheet value is already +/- par (e.g. -5)
+-- score_vs_par = -5, total_score = -5 + course_par
+UPDATE round_scores rs
+SET
+  hole_scores     = '{}',
+  holes_completed = 18,
+  is_complete     = true,
+  score_vs_par    = (rs.hole_scores->>'total')::int,
+  total_score     = (rs.hole_scores->>'total')::int + c.par
+FROM courses c
+JOIN events e ON e.id = rs.event_id
+WHERE rs.course_id = c.id
+  AND rs.is_scramble = true
+  AND e.year BETWEEN 2021 AND 2025
+  AND rs.hole_scores ? 'total';
+
+-- Also clear out any 2026 test scramble scores that are still in {total:N} format
+-- (these were saved before hole-by-hole scoring was fixed)
+DELETE FROM round_scores rs
+USING events e
+WHERE rs.event_id = e.id
+  AND e.year = 2026
+  AND rs.is_scramble = true
+  AND rs.hole_scores ? 'total';
 
 -- Verify
-SELECT 
-  is_scramble,
-  holes_completed,
+SELECT
+  e.year,
+  rs.is_scramble,
   COUNT(*) as rows,
-  COUNT(total_score) as has_total,
-  COUNT(score_vs_par) as has_vs_par
-FROM round_scores
-GROUP BY is_scramble, holes_completed
-ORDER BY is_scramble, holes_completed;
-
--- ================================================================
--- BACKFILL scramble_team_id from scramble_teams table
--- Links each player's scramble round_score to their team record
--- ================================================================
-UPDATE round_scores rs
-SET scramble_team_id = st.id
-FROM scramble_teams st
-JOIN events e ON e.id = st.event_id
-WHERE rs.event_id = st.event_id
-  AND rs.is_scramble = true
-  AND rs.scramble_team_id IS NULL
-  AND (
-    -- Match round to team round definition
-    (rs.day = 'friday'   AND rs.round_time = 'afternoon' AND st.round = 'friday_afternoon')   OR
-    (rs.day = 'saturday' AND rs.round_time = 'afternoon' AND st.round = 'saturday_afternoon') OR
-    (rs.day = 'sunday'   AND rs.round_time = 'morning'   AND st.round = 'sunday_morning')
-  )
-  AND rs.player_id = ANY(st.player_ids);
-
--- Verify scramble_team_id backfill
-SELECT 
-  e.year, rs.day, rs.round_time,
-  COUNT(*) as total_rows,
-  COUNT(rs.scramble_team_id) as has_team_id
+  COUNT(rs.total_score) as has_total,
+  COUNT(rs.score_vs_par) as has_vs_par,
+  SUM(CASE WHEN rs.hole_scores = '{}' THEN 1 ELSE 0 END) as empty_holes,
+  SUM(CASE WHEN rs.hole_scores ? '1' THEN 1 ELSE 0 END) as per_hole,
+  ROUND(AVG(rs.total_score),1) as avg_total,
+  ROUND(AVG(rs.score_vs_par),1) as avg_vs_par
 FROM round_scores rs
 JOIN events e ON e.id = rs.event_id
-WHERE rs.is_scramble = true
-GROUP BY e.year, rs.day, rs.round_time
-ORDER BY e.year, rs.day, rs.round_time;
+GROUP BY e.year, rs.is_scramble
+ORDER BY e.year, rs.is_scramble;
