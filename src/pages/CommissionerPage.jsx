@@ -243,8 +243,15 @@ function EventTab() {
       ])
       const { sortPlayersByScore } = await import('../lib/golf.js')
       const withScores = (scores || [])
-        .filter(sc => sc.is_complete && (sc.hole_scores ? 'total' in (typeof sc.hole_scores === 'string' ? JSON.parse(sc.hole_scores) : sc.hole_scores) : false))
-        .map(sc => ({ ...sc, hole_scores: typeof sc.hole_scores === 'string' ? JSON.parse(sc.hole_scores) : sc.hole_scores }))
+        .filter(sc => sc.is_complete)
+        .map(sc => {
+          const hs = typeof sc.hole_scores === 'string' ? JSON.parse(sc.hole_scores) : (sc.hole_scores || {})
+          // Calculate total_score from hole_scores if not present
+          const total = hs['total'] != null
+            ? parseInt(hs['total'])
+            : Object.values(hs).reduce((sum, v) => sum + (parseInt(v) || 0), 0)
+          return { ...sc, hole_scores: hs, total_score: total }
+        })
       sorted = sortPlayersByScore(withScores, holeData || [])
     }
 
