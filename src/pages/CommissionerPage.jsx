@@ -992,6 +992,52 @@ function ScoresTab() {
         </div>
       )}
 
+
+      {/* Reset Round — testing/correction tool */}
+      {event && (
+        <div className="card card-sm" style={{ marginTop: 16, borderColor: 'rgba(214,69,69,0.3)' }}>
+          <p className="text-xs text-mono" style={{ marginBottom: 8, textTransform: 'uppercase', color: 'var(--red)' }}>⚠️ Reset / Testing</p>
+          <p className="text-xs text-muted" style={{ marginBottom: 10 }}>Permanently deletes all scores for a round.</p>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 5, marginBottom: 10 }}>
+            {[
+              { label: 'Fri AM', day: 'friday', rt: 'morning' },
+              { label: 'Fri PM', day: 'friday', rt: 'afternoon' },
+              { label: 'Sat AM', day: 'saturday', rt: 'morning' },
+              { label: 'Sat PM', day: 'saturday', rt: 'afternoon' },
+              { label: 'Sun', day: 'sunday', rt: 'morning' },
+            ].map(r => (
+              <button key={r.label}
+                onClick={async () => {
+                  if (!window.confirm(`Delete ALL ${r.label} scores for ${event.year}? Cannot be undone.`)) return
+                  const result = await db('reset_round', { event_id: event.id, day: r.day, round_time: r.rt })
+                  showToast(`Reset ${r.label} — ${result.data?.deleted || 0} rows deleted`, 'success')
+                }}
+                style={{ padding: '7px 2px', border: '1px solid rgba(214,69,69,0.4)', borderRadius: 'var(--radius)', background: 'transparent', color: 'var(--red)', fontFamily: 'var(--font-body)', fontSize: '0.68rem', cursor: 'pointer', textAlign: 'center' }}>
+                Reset {r.label}
+              </button>
+            ))}
+          </div>
+          <p className="text-xs text-muted" style={{ marginBottom: 8 }}>Delete scramble teams:</p>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 5 }}>
+            {[
+              { label: 'Fri PM', round: 'friday_afternoon' },
+              { label: 'Sat PM', round: 'saturday_afternoon' },
+              { label: 'Sunday', round: 'sunday_morning' },
+            ].map(r => (
+              <button key={r.round}
+                onClick={async () => {
+                  if (!window.confirm(`Delete ${r.label} teams for ${event.year}?`)) return
+                  const result = await db('reset_scramble_teams', { event_id: event.id, round: r.round })
+                  showToast(`${r.label} teams deleted`, 'success')
+                }}
+                style={{ padding: '7px 2px', border: '1px solid rgba(214,69,69,0.4)', borderRadius: 'var(--radius)', background: 'transparent', color: 'var(--red)', fontFamily: 'var(--font-body)', fontSize: '0.68rem', cursor: 'pointer', textAlign: 'center' }}>
+                Reset {r.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {toast && <div className={`toast ${toast.type}`}>{toast.msg}</div>}
     </div>
   )

@@ -587,6 +587,29 @@ async function handleAction(sql, action, p = {}) {
       return { data: rows }
     }
 
+
+    case 'reset_round': {
+      // Delete all round_scores for a specific round of the current event
+      // Commissioner only — used for testing/correction
+      const result = await sql`
+        DELETE FROM round_scores
+        WHERE event_id = ${p.event_id}
+          AND day = ${p.day}
+          AND round_time = ${p.round_time}
+        RETURNING id`
+      return { data: { deleted: result.length } }
+    }
+
+    case 'reset_scramble_teams': {
+      // Delete scramble teams for a round (allows regeneration)
+      const result = await sql`
+        DELETE FROM scramble_teams
+        WHERE event_id = ${p.event_id}
+          AND round = ${p.round}
+        RETURNING id`
+      return { data: { deleted: result.length } }
+    }
+
     default:
       throw new Error(`Unknown action: ${action}`)
   }

@@ -336,8 +336,17 @@ export default function ScorecardPage() {
               const pts = scores[m.player_id] || {}
               const tot = calculateTotal(Object.fromEntries(Object.entries(pts).filter(([,v]) => v)))
               const isMe = player?.id === m.player_id
-              const par = course?.par
-              const diff = tot && par ? tot - par : null
+              // Calculate +/- as sum of (score - par) for each scored hole
+              // so it's accurate mid-round, not vs total course par
+              let diff = null
+              if (tot > 0 && holes.length > 0) {
+                diff = Object.entries(pts)
+                  .filter(([, v]) => v)
+                  .reduce((sum, [holeNum, score]) => {
+                    const holeData = holes.find(h => h.hole_number === parseInt(holeNum))
+                    return sum + (parseInt(score) - (holeData?.par || 4))
+                  }, 0)
+              }
               const diffTxt = diff === null ? '–' : diff === 0 ? 'E' : diff > 0 ? `+${diff}` : `${diff}`
               const diffColor = diff < 0 ? 'var(--blue-birdie)' : diff > 0 ? 'var(--red)' : 'var(--gray-300)'
               return (
