@@ -304,8 +304,8 @@ function DetailView({ standings, holes, par, currentPlayer }) {
         <table style={{ borderCollapse: 'separate', borderSpacing: 0, whiteSpace: 'nowrap', fontSize: '0.75rem', minWidth: '100%' }}>
           <thead>
             <tr style={{ borderBottom: '1px solid var(--green-mid)' }}>
-              <th style={{ position: 'sticky', left: 0, background: 'var(--green-deep)', zIndex: 3, padding: '5px 8px', textAlign: 'left', fontFamily: 'var(--font-mono)', fontSize: '0.65rem', color: 'var(--gray-500)', fontWeight: 500, minWidth: 80, borderRight: '1px solid var(--green-mid)' }}>
-                Player
+              <th style={{ position: 'sticky', left: 0, background: 'var(--green-deep)', zIndex: 3, padding: '5px 8px', textAlign: 'left', fontFamily: 'var(--font-mono)', fontSize: '0.65rem', color: 'var(--gray-500)', fontWeight: 500, minWidth: 100, borderRight: '1px solid var(--green-mid)' }}>
+                # · Player
               </th>
               {sortedHoles.map(h => (
                 <th key={h.hole_number} style={{
@@ -343,12 +343,18 @@ function DetailView({ standings, holes, par, currentPlayer }) {
                   <td style={{
                     position: 'sticky', left: 0, zIndex: 2,
                     background: stickyBg,
-                    padding: '6px 8px', fontFamily: 'var(--font-body)', fontSize: '0.75rem',
-                    fontWeight: 500, color: isMe ? 'var(--gold)' : 'var(--cream)',
+                    padding: '6px 8px',
                     borderBottom: '1px solid var(--green-mid)',
-                    borderRight: '1px solid var(--green-mid)', minWidth: 80,
+                    borderRight: '1px solid var(--green-mid)', minWidth: 100,
                   }}>
-                    {fmtName(sc.player_name)}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.72rem', fontWeight: 500, color: isMe ? 'var(--gold)' : 'var(--gray-500)', minWidth: 16, textAlign: 'right', flexShrink: 0 }}>
+                        {sc.not_started ? '–' : sc.is_tied ? '' : sc.finishing_position}
+                      </span>
+                      <span style={{ fontFamily: 'var(--font-body)', fontSize: '0.75rem', fontWeight: 500, color: isMe ? 'var(--gold)' : 'var(--cream)' }}>
+                        {fmtName(sc.player_name)}
+                      </span>
+                    </div>
                   </td>
                   {sortedHoles.map(h => {
                     const s = holeScores[String(h.hole_number)]
