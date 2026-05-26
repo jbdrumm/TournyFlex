@@ -132,11 +132,19 @@ function parseHoles(h) {
  * Works for 16 (4 teams), 20 (5 teams), 24 (6 teams).
  * Team 1: picks 1, 2N, 2N+1, 4N  (e.g. 20 players: 1,10,11,20)
  */
-export function generateScrambleTeams(sortedPlayers) {
+export function generateScrambleTeams(sortedPlayers, { forceTeamCount = null } = {}) {
   const n = sortedPlayers.length
-  const teamCount = n / 4
-  if (![4, 5, 6].includes(teamCount)) {
-    throw new Error(`Invalid player count: ${n}. Must be 16, 20, or 24.`)
+  if (n < 4) throw new Error(`Need at least 4 players to form a team.`)
+
+  // Determine team count: prefer even teams of 4, allow override for unusual counts
+  let teamCount
+  if (forceTeamCount) {
+    teamCount = forceTeamCount
+  } else if (n % 4 === 0) {
+    teamCount = n / 4
+  } else {
+    // Round up — some teams will have 3 players
+    teamCount = Math.ceil(n / 4)
   }
 
   const teams = Array.from({ length: teamCount }, (_, i) => ({
@@ -145,6 +153,7 @@ export function generateScrambleTeams(sortedPlayers) {
     finishing_positions: [],
   }))
 
+  // Snake draft: rounds alternate direction
   const rounds = [
     [...Array(teamCount).keys()],
     [...Array(teamCount).keys()].reverse(),

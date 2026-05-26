@@ -19,6 +19,7 @@ export default function ScorecardPage() {
   const [uploading, setUploading] = useState(false)
   const [toast, setToast] = useState(null)
   const [activeTab, setActiveTab] = useState('manual')
+  const [showSubmitted, setShowSubmitted] = useState(false)
 
   useEffect(() => { fetchSetup() }, [player])
 
@@ -363,6 +364,32 @@ export default function ScorecardPage() {
         )}
       </div>
       {toast && <div className={`toast ${toast.type}`}>{toast.msg}</div>}
+
+      {/* Round submitted modal */}
+      {showSubmitted && (
+        <SubmittedModal onDone={() => { setShowSubmitted(false); navigate('/leaderboard') }} />
+      )}
+    </div>
+  )
+}
+
+function SubmittedModal({ onDone }) {
+  useEffect(() => {
+    const t = setTimeout(onDone, 4000)
+    return () => clearTimeout(t)
+  }, [])
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ background: 'var(--green-dark)', border: '1px solid var(--gold)', borderRadius: 'var(--radius-lg)', padding: '40px 32px', textAlign: 'center', maxWidth: 280, margin: '0 16px' }}>
+        <div style={{ fontSize: '3rem', marginBottom: 12 }}>🏌️</div>
+        <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.5rem', marginBottom: 8, color: 'var(--gold)' }}>Round Submitted!</h2>
+        <p className="text-muted text-sm" style={{ marginBottom: 20 }}>Your scorecard has been saved.</p>
+        <div style={{ width: '100%', height: 4, background: 'var(--green-mid)', borderRadius: 2, overflow: 'hidden' }}>
+          <div style={{ height: '100%', background: 'var(--gold)', borderRadius: 2, animation: 'drain 4s linear forwards' }} />
+        </div>
+        <p className="text-xs text-muted" style={{ marginTop: 8 }}>Taking you to the leaderboard...</p>
+        <style>{`@keyframes drain { from { width: 100% } to { width: 0% } }`}</style>
+      </div>
     </div>
   )
 }
@@ -480,6 +507,11 @@ function ScrambleScoreEntry({ event, roundInfo, player }) {
         )}
       </div>
       {toast && <div className={`toast ${toast.type}`}>{toast.msg}</div>}
+
+      {/* Round submitted modal */}
+      {showSubmitted && (
+        <SubmittedModal onDone={() => { setShowSubmitted(false); navigate('/leaderboard') }} />
+      )}
     </div>
   )
 }

@@ -250,7 +250,19 @@ function EventTab() {
 
     const { generateScrambleTeams } = await import('../lib/golf.js')
     try {
-      const generated = generateScrambleTeams(sorted)
+      const n = sorted.length
+      let forceTeamCount = null
+      if (n % 4 !== 0 && n >= 4) {
+        const suggested = Math.ceil(n / 4)
+        const choice = window.confirm(
+          `${n} players scored (not a multiple of 4).\n\n` +
+          `OK = create ${suggested} teams (some will have 3 players)\n` +
+          `Cancel = abort team generation`
+        )
+        if (!choice) { setSaving && setSaving(false); return }
+        forceTeamCount = suggested
+      }
+      const generated = generateScrambleTeams(sorted, { forceTeamCount })
       await db('save_scramble_teams', {
         event_id: eventId, round,
         teams: generated.map(t => ({
@@ -1114,7 +1126,18 @@ function TeamsTab() {
     }
 
     try {
-      const generated = generateScrambleTeams(sorted)
+      const n = sorted.length
+      let forceTeamCount = null
+      if (n % 4 !== 0 && n >= 4) {
+        const choice = window.confirm(
+          `${n} players scored (not a multiple of 4).\n\n` +
+          `OK = create ${Math.ceil(n/4)} teams (some will have 3 players)\n` +
+          `Cancel = abort`
+        )
+        if (!choice) { setGenerating(false); return }
+        forceTeamCount = Math.ceil(n / 4)
+      }
+      const generated = generateScrambleTeams(sorted, { forceTeamCount })
       await db('save_scramble_teams', {
         event_id: event.id, round: selectedRound,
         teams: generated.map(t => ({
