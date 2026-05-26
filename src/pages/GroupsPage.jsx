@@ -275,12 +275,22 @@ export default function GroupsPage() {
                     border: isMine ? '2px solid var(--gold)' : '1px solid var(--green-mid)',
                     borderRadius: 'var(--radius)', padding: '8px 10px',
                   }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-                      <div style={{ width: 7, height: 7, borderRadius: '50%', background: TEAM_COLORS[idx % TEAM_COLORS.length], flexShrink: 0 }} />
-                      <span style={{ fontFamily: 'var(--font-sans)', fontSize: '0.82rem', fontWeight: 600 }}>
-                        Team {team.team_number}
-                      </span>
-                    </div>
+                    {(() => {
+                      const teeTime = calcTeeTime(baseTeeTime, team.team_number)
+                      return (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <div style={{ width: 7, height: 7, borderRadius: '50%', background: TEAM_COLORS[idx % TEAM_COLORS.length], flexShrink: 0 }} />
+                            <span style={{ fontFamily: 'var(--font-sans)', fontSize: '0.82rem', fontWeight: 600 }}>
+                              Team {team.team_number}
+                            </span>
+                          </div>
+                          {teeTime && (
+                            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.72rem', color: 'var(--gold)' }}>{formatTime(teeTime)}</span>
+                          )}
+                        </div>
+                      )
+                    })()}
                     {(team.players || []).map((p, pi) => {
                       const rank = (team.finishing_positions || [])[pi]
                       const minRank = Math.min(...(team.finishing_positions || [1]))

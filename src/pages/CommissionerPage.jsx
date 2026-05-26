@@ -631,7 +631,7 @@ function ScoresTab() {
     setCurrentHole(1)
 
     // Load holes for the course
-    const course = getCourseForRound(event, def.day)
+    const course = getCourseForRound(event, def.day, def.rt)
     if (course?.id) {
       const { data: h } = await db('get_course_holes', { course_id: course.id })
       setHoles((h || []).sort((a, b) => a.hole_number - b.hole_number))
@@ -660,7 +660,7 @@ function ScoresTab() {
 
     // Load existing scores for all members
     const def = ALL_ROUNDS.find(r => r.key === selectedRound)
-    const course = getCourseForRound(event, def.day)
+    const course = getCourseForRound(event, def.day, def.rt)
     if (!course?.id) return
     const newScores = {}
     await Promise.all(members.map(async m => {
@@ -708,7 +708,7 @@ function ScoresTab() {
     if (!event || groupMembers.length === 0) return
     setSaving(true)
     const def = ALL_ROUNDS.find(r => r.key === selectedRound)
-    const course = getCourseForRound(event, def.day)
+    const course = getCourseForRound(event, def.day, def.rt)
 
     if (def.is_scramble) {
       // Scramble: one score for all players
@@ -804,7 +804,7 @@ function ScoresTab() {
   const showToast = (msg, type) => { setToast({ msg, type }); setTimeout(() => setToast(null), 3000) }
 
   const def = ALL_ROUNDS.find(r => r.key === selectedRound)
-  const course = event && def ? getCourseForRound(event, def.day) : null
+  const course = event && def ? getCourseForRound(event, def.day, def.rt) : null
   const currentHoleData = holes.find(h => h.hole_number === currentHole)
   const holePar = currentHoleData?.par || 4
 
