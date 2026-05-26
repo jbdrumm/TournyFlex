@@ -413,12 +413,15 @@ function SubmittedModal({ onDone }) {
   )
 }
 
-// ── SCRAMBLE SCORE ENTRY ─────────────────────────────────────────────────────
+// ── SCRAMBLE SCORE ENTRY — hole-by-hole, single team score per hole ──────────
 function ScrambleScoreEntry({ event, roundInfo, player }) {
+  const navigate = useNavigate()
   const [team, setTeam] = useState(null)
-  const [score, setScore] = useState(null)
+  const [holes, setHoles] = useState([])
+  const [scores, setScores] = useState({})   // { "1": -1, "2": 0, ... } running score vs par
+  const [currentHole, setCurrentHole] = useState(1)
   const [saving, setSaving] = useState(false)
-  const [saved, setSaved] = useState(false)
+  const [showSubmitted, setShowSubmitted] = useState(false)
   const [toast, setToast] = useState(null)
 
   const day = roundInfo?.round?.split('_')[0]
@@ -428,16 +431,10 @@ function ScrambleScoreEntry({ event, roundInfo, player }) {
 
   const fetchTeam = async () => {
     if (!player || !event) return
-    const { data: group } = await db('get_player_group', {
-      event_id: event.id, day, player_id: player.id
-    })
-    if (!group) return
+    const round = roundInfo?.round
 
-    // Find scramble team for this player
-    const { data: teams } = await db('get_scramble_teams', {
-      event_id: event.id,
-      round: roundInfo?.round
-    })
+    // Find this player's scramble team
+    const { data: teams } = await db('get_scramble_teams', { event_id: event.id, round })
     if (!teams?.length) return
 
     const myTeam = teams.find(t => {
@@ -446,88 +443,203 @@ function ScrambleScoreEntry({ event, roundInfo, player }) {
     })
     if (!myTeam) return
 
-    // Enrich team with player names from event_players
+    // Get player names
     const { data: eventPlayers } = await db('get_players_for_event', { event_id: event.id })
     const nameMap = {}
-    eventPlayers?.forEach(ep => { nameMap[ep.player_id] = ep.name })
+    eventPlayers?.forEach(p => { nameMap[p.player_id] = p.name })
     const pids = typeof myTeam.player_ids === 'string' ? JSON.parse(myTeam.player_ids) : myTeam.player_ids
     setTeam({ ...myTeam, member_names: pids.map(pid => nameMap[pid] || pid) })
 
-    // Load existing score
+    // Load course holes
+    const courseId = day === 'friday' ? event.friday_course_id
+                   : day === 'saturday' ? event.saturday_course_id : event.sunday_course_id
+    if (courseId) {
+      const { data: h } = await db('get_course_holes', { course_id: courseId })
+      setHoles((h || []).sort((a, b) => a.hole_number - b.hole_number))
+    } else {
+      setHoles(Array.from({length:18},(_,i)=>({hole_number:i+1,par:4,handicap_rank:i+1})))
+    }
+
+    // Load existing scores (one player represents the whole team)
     const { data: sc } = await db('get_player_round', {
       event_id: event.id, player_id: player.id, day, round_time
     })
-    if (sc?.score != null) setScore(sc.score)
+    if (sc?.hole_scores) {
+      const hs = typeof sc.hole_scores === 'string' ? JSON.parse(sc.hole_scores) : sc.hole_scores
+      // Convert stored scores back to display values
+      setScores(hs)
+    }
   }
 
-  const handleSave = async () => {
-    if (score === null || !team || !event) return
+  const currentHoleData = holes.find(h => h.hole_number === currentHole)
+  const holePar = currentHoleData?.par || 4
+
+  const getHoleScore = (holeNum) => {
+    const val = scores[String(holeNum)]
+    return val != null ? val : holePar  // default to par
+  }
+
+  const adjust = (delta) => {
+    setScores(s => ({
+      ...s,
+      [String(currentHole)]: Math.max(1, Math.min(15, (s[String(currentHole)] ?? holePar) + delta))
+    }))
+  }
+
+  const saveAndNext = async () => {
     setSaving(true)
-    const pids = typeof team.player_ids === 'string' ? JSON.parse(team.player_ids) : team.player_ids
-    const courseId = day === 'friday' ? event.friday_course_id : day === 'saturday' ? event.saturday_course_id : event.sunday_course_id
-    await db('save_scramble_score', {
-      event_id: event.id, course_id: courseId,
-      day, round_time, player_ids: pids, score
-    })
+    // Commit current hole
+    const committed = { ...scores, [String(currentHole)]: scores[String(currentHole)] ?? holePar }
+    setScores(committed)
+    await saveToDb(committed)
     setSaving(false)
-    setSaved(true)
-    setToast({ msg: 'Team score saved! ✓', type: 'success' })
-    setTimeout(() => setToast(null), 3000)
+    setCurrentHole(h => Math.min(18, h + 1))
   }
 
-  const pids = team ? (typeof team.player_ids === 'string' ? JSON.parse(team.player_ids) : team.player_ids) : []
+  const saveHole18 = async () => {
+    setSaving(true)
+    const committed = { ...scores }
+    // Commit all 18 with par defaults
+    holes.forEach(h => {
+      if (committed[String(h.hole_number)] == null) committed[String(h.hole_number)] = h.par
+    })
+    setScores(committed)
+    await saveToDb(committed)
+    setSaving(false)
+    setShowSubmitted(true)
+  }
+
+  const saveToDb = async (holeScores) => {
+    if (!team || !event) return
+    const pids = typeof team.player_ids === 'string' ? JSON.parse(team.player_ids) : team.player_ids
+    const courseId = day === 'friday' ? event.friday_course_id
+                   : day === 'saturday' ? event.saturday_course_id : event.sunday_course_id
+    // Save all team members with same hole scores
+    for (const pid of pids) {
+      await db('upsert_round_score', {
+        event_id: event.id, player_id: pid, course_id: courseId,
+        day, round_time, is_scramble: true,
+        hole_scores: holeScores,
+        holes_completed: Object.keys(holeScores).length,
+        is_complete: Object.keys(holeScores).length >= 18,
+      })
+    }
+  }
+
+  const showToast = (msg, type) => { setToast({msg, type}); setTimeout(() => setToast(null), 3000) }
+
+  const holeScore = getHoleScore(currentHole)
+  const diff = holeScore - holePar
+  const diffTxt = diff === 0 ? 'E' : diff > 0 ? `+${diff}` : `${diff}`
+  const diffColor = diff < 0 ? 'var(--blue-birdie)' : diff > 0 ? 'var(--red)' : 'var(--gray-500)'
+
+  // Running total vs par
+  const runningDiff = Object.entries(scores).reduce((sum, [holeNum, score]) => {
+    const h = holes.find(h => h.hole_number === parseInt(holeNum))
+    return sum + (parseInt(score) - (h?.par || 4))
+  }, 0)
+  const runningTxt = runningDiff === 0 ? 'E' : runningDiff > 0 ? `+${runningDiff}` : `${runningDiff}`
+
+  if (!team) return (
+    <div className="page"><div className="container" style={{ textAlign: 'center', paddingTop: 60 }}>
+      <p style={{ fontSize: '2rem', marginBottom: 8 }}>⏳</p>
+      <p className="text-muted">No scramble team assigned yet.</p>
+      <p className="text-xs text-muted" style={{ marginTop: 8 }}>Check the Groups tab for your team.</p>
+    </div></div>
+  )
 
   return (
     <div className="page">
       <div className="container">
-        <div style={{ paddingTop: 20, paddingBottom: 12, borderBottom: '1px solid var(--green-mid)', marginBottom: 16 }}>
+        <div style={{ paddingTop: 20, paddingBottom: 12, borderBottom: '1px solid var(--green-mid)', marginBottom: 12 }}>
           <p style={{ fontFamily: 'var(--font-mono)', fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--gold)', marginBottom: 2 }}>{roundInfo?.label}</p>
-          <h1 style={{ fontSize: '1.6rem' }}>Scramble Score</h1>
+          <h1 style={{ fontSize: '1.6rem' }}>Scramble Scorecard</h1>
         </div>
 
-        {!team ? (
-          <div className="card" style={{ textAlign: 'center', padding: 40 }}>
-            <p style={{ fontSize: '2rem', marginBottom: 8 }}>⏳</p>
-            <p className="text-muted">No scramble team assigned yet.</p>
-            <p className="text-xs text-muted" style={{ marginTop: 8 }}>Check the Groups tab for your team.</p>
+        <div className="card">
+          {/* Hole selector */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+            <button onClick={() => setCurrentHole(h => Math.max(1, h - 1))} disabled={currentHole === 1}
+              style={{ width: 44, height: 44, border: '1px solid var(--green-mid)', borderRadius: 'var(--radius)', background: 'var(--green-deep)', color: currentHole === 1 ? 'var(--gray-700)' : 'var(--cream)', fontSize: '1.4rem', cursor: currentHole === 1 ? 'default' : 'pointer' }}>‹</button>
+            <div style={{ textAlign: 'center' }}>
+              <p style={{ fontFamily: 'var(--font-display)', fontSize: '1.5rem', fontWeight: 700, lineHeight: 1 }}>Hole {currentHole}</p>
+              <p style={{ fontFamily: 'var(--font-mono)', fontSize: '0.68rem', color: 'var(--gray-500)', marginTop: 2 }}>
+                Par {holePar} · Hdcp #{currentHoleData?.handicap_rank || '–'}
+                {currentHoleData?.yardage_white ? ` · ${currentHoleData.yardage_white} yds` : ''}
+              </p>
+            </div>
+            <button onClick={() => setCurrentHole(h => Math.min(18, h + 1))} disabled={currentHole === 18}
+              style={{ width: 44, height: 44, border: '1px solid var(--green-mid)', borderRadius: 'var(--radius)', background: 'var(--green-deep)', color: currentHole === 18 ? 'var(--gray-700)' : 'var(--cream)', fontSize: '1.4rem', cursor: currentHole === 18 ? 'default' : 'pointer' }}>›</button>
           </div>
-        ) : (
-          <div className="card">
-            <p className="text-xs text-muted text-mono" style={{ marginBottom: 10, textTransform: 'uppercase' }}>
-              Team {team.team_number}
-            </p>
 
-            {/* Team member list — single compact line */}
-            <div style={{ marginBottom: 20, padding: '10px 12px', background: 'var(--green-deep)', borderRadius: 'var(--radius)', lineHeight: 1.6 }}>
-              {(team.member_names || []).map((name, i) => (
-                <span key={i} style={{ fontSize: '0.875rem', color: name === player.name ? 'var(--gold)' : 'var(--cream)', fontWeight: name === player.name ? 600 : 400 }}>
-                  {i > 0 && <span style={{ color: 'var(--gray-500)', margin: '0 6px' }}>·</span>}
-                  {name}
-                </span>
-              ))}
+          {/* Progress dots — 2 rows */}
+          <div style={{ marginBottom: 12 }}>
+            {[holes.slice(0,9), holes.slice(9,18)].map((row, rowIdx) => (
+              <div key={rowIdx} style={{ display: 'flex', gap: 3, justifyContent: 'center', marginBottom: rowIdx === 0 ? 3 : 0 }}>
+                {row.map(h => {
+                  const scored = scores[String(h.hole_number)] != null
+                  return (
+                    <button key={h.hole_number} onClick={() => setCurrentHole(h.hole_number)}
+                      style={{ width: 22, height: 22, borderRadius: '50%', border: 'none', cursor: 'pointer', background: h.hole_number === currentHole ? 'var(--gold)' : scored ? 'var(--green-light)' : 'var(--green-mid)', fontSize: '0.62rem', fontFamily: 'var(--font-mono)', color: h.hole_number === currentHole ? 'var(--green-deep)' : 'var(--cream)', fontWeight: h.hole_number === currentHole ? 700 : 400 }}>
+                      {h.hole_number}
+                    </button>
+                  )
+                })}
+              </div>
+            ))}
+          </div>
+
+          <div style={{ height: 1, background: 'var(--green-mid)', marginBottom: 12 }} />
+
+          {/* Single team row */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 4px' }}>
+            <div style={{ flex: 1 }}>
+              <span style={{ fontWeight: 600, color: 'var(--gold)', fontSize: '0.95rem' }}>Team {team.team_number}</span>
             </div>
+            <button onClick={() => adjust(-1)}
+              style={{ width: 40, height: 40, border: '1px solid var(--green-mid)', borderRadius: 'var(--radius)', background: 'var(--green-deep)', color: 'var(--cream)', fontSize: '1.3rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>−</button>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '1.8rem', fontWeight: 700, minWidth: 32, textAlign: 'center' }}>{holeScore}</span>
+            <button onClick={() => adjust(1)}
+              style={{ width: 40, height: 40, border: '1px solid var(--green-mid)', borderRadius: 'var(--radius)', background: 'var(--green-deep)', color: 'var(--cream)', fontSize: '1.3rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.9rem', fontWeight: 500, minWidth: 28, textAlign: 'right', color: diffColor }}>{diffTxt}</span>
+          </div>
 
-            <p className="text-xs text-muted text-mono" style={{ marginBottom: 12, textTransform: 'uppercase' }}>Team Score (over/under par)</p>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 20, marginBottom: 24 }}>
-              <button onClick={() => setScore(s => (s ?? 0) - 1)}
-                style={{ width: 52, height: 52, border: '1px solid var(--green-mid)', borderRadius: 'var(--radius)', background: 'var(--green-deep)', color: 'var(--cream)', fontSize: '1.6rem', cursor: 'pointer' }}>−</button>
-              <span style={{ fontFamily: 'var(--font-mono)', fontSize: '2.2rem', fontWeight: 700, minWidth: 60, textAlign: 'center',
-                color: score === null ? 'var(--gray-500)' : score < 0 ? 'var(--blue-birdie)' : score > 0 ? 'var(--red)' : 'var(--cream)' }}>
-                {score === null ? '–' : score > 0 ? `+${score}` : score}
-              </span>
-              <button onClick={() => setScore(s => (s ?? 0) + 1)}
-                style={{ width: 52, height: 52, border: '1px solid var(--green-mid)', borderRadius: 'var(--radius)', background: 'var(--green-deep)', color: 'var(--cream)', fontSize: '1.6rem', cursor: 'pointer' }}>+</button>
-            </div>
+          <div style={{ height: 1, background: 'var(--green-mid)', margin: '8px 0 12px' }} />
 
-            <button className="btn btn-primary btn-full" onClick={handleSave} disabled={saving || score === null}>
-              {saving ? 'Saving...' : saved ? 'Score Saved ✓' : 'Save Team Score'}
+          {/* Action row */}
+          {currentHole < 18 ? (
+            <button className="btn btn-primary btn-full" onClick={saveAndNext} disabled={saving}>
+              {saving ? 'Saving...' : 'Save & Next →'}
             </button>
+          ) : (
+            <button className="btn btn-primary btn-full" onClick={saveHole18} disabled={saving}>
+              {saving ? 'Saving...' : 'Save Hole 18 ✓'}
+            </button>
+          )}
+        </div>
+
+        {/* Team summary */}
+        <div className="card card-sm" style={{ marginTop: 8 }}>
+          <p className="text-xs text-muted text-mono" style={{ marginBottom: 8, textTransform: 'uppercase' }}>Team Summary</p>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 0', marginBottom: 4 }}>
+            <span style={{ fontWeight: 600, color: 'var(--gold)', fontSize: '0.875rem' }}>Team {team.team_number}</span>
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+              <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: '0.95rem' }}>
+                {Object.values(scores).reduce((a,v) => a+(parseInt(v)||0), 0) || '–'}
+              </span>
+              {Object.keys(scores).length > 0 && (
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.8rem', color: runningDiff < 0 ? 'var(--blue-birdie)' : runningDiff > 0 ? 'var(--red)' : 'var(--gray-300)' }}>{runningTxt}</span>
+              )}
+            </div>
           </div>
-        )}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+            {(team.member_names || []).map((name, i) => (
+              <span key={i} style={{ fontSize: '0.75rem', color: name === player?.name ? 'var(--gold)' : 'var(--gray-400)', fontWeight: name === player?.name ? 600 : 400 }}>{name}{i < (team.member_names?.length||0)-1 ? ' ·' : ''}</span>
+            ))}
+          </div>
+        </div>
       </div>
       {toast && <div className={`toast ${toast.type}`}>{toast.msg}</div>}
-
-      {/* Round submitted modal */}
       {showSubmitted && (
         <SubmittedModal onDone={() => { setShowSubmitted(false); navigate('/leaderboard') }} />
       )}

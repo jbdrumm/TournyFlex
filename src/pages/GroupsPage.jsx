@@ -84,21 +84,17 @@ export default function GroupsPage() {
       setScrambleTeams([])
     } else {
       const { data } = await db('get_scramble_teams', { event_id: event.id, round: activeTab })
-      // Enrich with player names from round scores
       if (data?.length) {
-        const { data: scores } = await db('get_round_scores', {
-          event_id: event.id,
-          day: tab.day,
-          round_time: tab.round_time === 'morning' ? 'morning' : 'afternoon'
-        })
+        // Use event roster for names — teams shown before scoring begins
+        const { data: eventPlayers } = await db('get_players_for_event', { event_id: event.id })
         const playerMap = {}
-        scores?.forEach(s => { playerMap[s.player_id] = s })
+        eventPlayers?.forEach(p => { playerMap[p.player_id] = p.name })
         const built = data.map(t => ({
           ...t,
           player_ids: typeof t.player_ids === 'string' ? JSON.parse(t.player_ids) : t.player_ids,
           finishing_positions: typeof t.finishing_positions === 'string' ? JSON.parse(t.finishing_positions) : t.finishing_positions,
           players: (typeof t.player_ids === 'string' ? JSON.parse(t.player_ids) : t.player_ids)
-            .map(pid => playerMap[pid] || { player_id: pid, player_name: '–' }).filter(Boolean),
+            .map(pid => ({ player_id: pid, player_name: playerMap[pid] || '–' })),
         }))
         setScrambleTeams(built)
       } else {
@@ -239,7 +235,7 @@ export default function GroupsPage() {
             </>
           )
         ) : (
-          // ── SCRAMBLE TEAMS VIEW ──────────────────────────────────
+          // ── SCRAMBLE TEAMS VIEW ── same style as morning groups ──────
           scrambleTeams.length === 0 ? (
             <div className="card" style={{ textAlign: 'center', padding: 40 }}>
               <p style={{ fontSize: '2rem', marginBottom: 8 }}>⏳</p>
@@ -248,53 +244,45 @@ export default function GroupsPage() {
             </div>
           ) : (
             <>
+              {/* Show logged-in player's team at top */}
+              {player && (() => {
+                const myTeam = scrambleTeams.find(t => t.players?.some(p => p.player_id === player.id))
+                if (!myTeam) return null
+                return (
+                  <div style={{ marginBottom: 8, background: 'rgba(201,168,76,0.1)', border: '1px solid rgba(201,168,76,0.3)', borderRadius: 'var(--radius)', padding: '8px 12px' }}>
+                    <p className="text-xs" style={{ color: 'var(--gold)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', marginBottom: 2 }}>Your Team</p>
+                    <p style={{ fontWeight: 600 }}>Team {myTeam.team_number}</p>
+                  </div>
+                )
+              })()}
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
               {scrambleTeams.map((team, idx) => {
                 const isMine = player && team.players?.some(p => p.player_id === player.id)
                 return (
-                  <div key={team.team_number} className="team-card" style={{
-                    borderLeftColor: TEAM_COLORS[idx % TEAM_COLORS.length],
-                    borderWidth: isMine ? '2px' : '1px',
-                    borderStyle: 'solid',
-                    borderColor: isMine ? 'var(--gold)' : 'var(--green-mid)',
+                  <div key={team.team_number} style={{
+                    background: 'var(--green-dark)',
+                    border: isMine ? '2px solid var(--gold)' : '1px solid var(--green-mid)',
+                    borderRadius: 'var(--radius)', padding: '8px 10px',
                   }}>
-                    <div className="team-header">
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span style={{ fontFamily: 'var(--font-sans)', fontSize: '0.9rem', fontWeight: 600 }}>Team {team.team_number}</span>
-                        
-                      </div>
-                      <span className="text-xs text-muted text-mono">Pos: {(team.finishing_positions||[]).join(', ')}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                      <div style={{ width: 7, height: 7, borderRadius: '50%', background: TEAM_COLORS[idx % TEAM_COLORS.length], flexShrink: 0 }} />
+                      <span style={{ fontFamily: 'var(--font-sans)', fontSize: '0.82rem', fontWeight: 600 }}>
+                        Team {team.team_number}
+                      </span>
                     </div>
-                    {(team.players||[]).map((p, pi) => (
-                      <div key={p.player_id||pi} className="team-player" style={{ background: player?.id === p.player_id ? 'rgba(201,168,76,0.08)' : 'transparent' }}>
-                        <span className="team-position">#{team.finishing_positions?.[pi]}</span>
-                        <span style={{ flex: 1, fontWeight: player?.id === p.player_id ? 700 : 400, color: player?.id === p.player_id ? 'var(--gold)' : 'var(--cream)' }}>
+                    {(team.players || []).map(p => (
+                      <div key={p.player_id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '3px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                        <span style={{ width: 5, height: 5, borderRadius: '50%', flexShrink: 0, background: player?.id === p.player_id ? 'var(--gold)' : 'var(--green-mid)' }} />
+                        <span style={{ fontSize: '0.78rem', fontWeight: player?.id === p.player_id ? 600 : 400, color: player?.id === p.player_id ? 'var(--gold)' : 'var(--cream)' }}>
                           {p.player_name}
-                          
                         </span>
-                        {p.total_score > 0 && <span className="text-mono text-sm text-muted">{p.total_score}</span>}
                       </div>
                     ))}
-
-                    {/* Scramble score entry — anyone on the team can submit */}
-                    {(isMine || isCommissioner) && (
-                      <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid var(--green-mid)', display: 'flex', gap: 8, alignItems: 'center' }}>
-                        <span className="text-xs text-muted" style={{ flexShrink: 0 }}>Team score (+/– par):</span>
-                        <input type="number" min="-20" max="20"
-                          className="input input-mono"
-                          placeholder="e.g. –5"
-                          style={{ width: 80, padding: '6px 8px', fontSize: '0.9rem', textAlign: 'center' }}
-                          value={scrambleScore[team.team_number] ?? ''}
-                          onChange={e => setScrambleScore(s => ({ ...s, [team.team_number]: e.target.value }))} />
-                        <button className="btn btn-sm btn-primary"
-                          onClick={() => handleSaveScrambleScore(team)}
-                          disabled={savingScore === team.team_number || !scrambleScore[team.team_number]}>
-                          {savingScore === team.team_number ? '...' : 'Save'}
-                        </button>
-                      </div>
-                    )}
                   </div>
                 )
               })}
+              </div>
             </>
           )
         )}
