@@ -706,10 +706,17 @@ function ScoresTab() {
         showToast('Scramble score saved!', 'success')
       }
     } else {
-      // Stroke play: save each player's hole scores
+      // Stroke play: commit all 18 holes, using par as default for any unedited holes
       for (const member of groupMembers) {
         const holeScores = {}
-        Object.entries(scores[member.player_id] || {}).forEach(([k, v]) => { if (v) holeScores[k] = parseInt(v) })
+        // First pass: fill all 18 holes with par as default
+        holes.forEach(h => {
+          holeScores[String(h.hole_number)] = h.par
+        })
+        // Second pass: override with any explicitly entered scores
+        Object.entries(scores[member.player_id] || {}).forEach(([k, v]) => {
+          if (v) holeScores[k] = parseInt(v)
+        })
         const total = Object.values(holeScores).reduce((a, v) => a + v, 0)
         const holesCompleted = Object.keys(holeScores).length
         await db('upsert_round_score', {
