@@ -142,7 +142,7 @@ export default function HomePage() {
                     <button className="btn btn-secondary btn-full" onClick={() => navigate('/leaderboard')}>View Leaderboard</button>
                   )}
                   {(isScrambleActive || event.status === 'complete') && (
-                    <button className="btn btn-ghost btn-full" onClick={() => navigate('/teams')}>View Scramble Teams</button>
+                    <button className="btn btn-ghost btn-full" onClick={() => navigate('/groups')}>View Scramble Teams</button>
                   )}
                 </div>
               </div>

@@ -49,57 +49,88 @@ export default function LeaderboardPage() {
       setEvent(ev)
 
       const roundInfo = getActiveRound(ev.status)
-      // Only show leaderboard for stroke play morning rounds
-      if (!roundInfo?.round || roundInfo.round.includes('afternoon') || roundInfo.round === 'sunday_morning') {
-        setStandings([])
-        setLoading(false)
-        return
-      }
+      if (!roundInfo?.round) { setStandings([]); setLoading(false); return }
 
+      const isScramble = roundInfo.round.includes('afternoon') || roundInfo.round === 'sunday_morning'
       const day = roundInfo.round.split('_')[0]
+      const round_time = isScramble ? (roundInfo.round === 'sunday_morning' ? 'morning' : 'afternoon') : 'morning'
       const course = getCourseForRound(ev, day)
 
-      const [holesRes, scoresRes, playersRes] = await Promise.all([
+      const [holesRes, scoresRes] = await Promise.all([
         course?.id ? db('get_course_holes', { course_id: course.id }) : Promise.resolve({ data: [] }),
-        db('get_round_scores', { event_id: ev.id, day, round_time: 'morning' }),
-        db('get_players_for_event', { event_id: ev.id }),
+        db('get_round_scores', { event_id: ev.id, day, round_time }),
       ])
 
       const courseHoles = holesRes.data || []
       setHoles(courseHoles)
 
-      // Build scored map
-      const scoredMap = {}
-      ;(scoresRes.data || []).forEach(sc => { scoredMap[sc.player_id] = sc })
+      if (isScramble) {
+        // Scramble: deduplicate by scramble_team_id, show one row per team
+        const { data: teams } = await db('get_scramble_teams', { event_id: ev.id, round: roundInfo.round })
+        const scoreMap = {}
+        ;(scoresRes.data || []).forEach(sc => { scoreMap[sc.player_id] = sc })
 
-      // If we have scores but no event_players list, still show scores
-      const eventPlayerIds = new Set((playersRes.data || []).map(ep => ep.player_id))
-      ;(scoresRes.data || []).forEach(sc => {
-        if (!eventPlayerIds.has(sc.player_id)) {
-          playersRes.data = playersRes.data || []
-          playersRes.data.push({ player_id: sc.player_id, name: sc.player_name })
-        }
-      })
+        const teamStandings = (teams || []).map(t => {
+          const pids = typeof t.player_ids === 'string' ? JSON.parse(t.player_ids) : t.player_ids
+          // Get score from first team member who has one
+          const scored = pids.map(pid => scoreMap[pid]).find(sc => sc?.hole_scores)
+          const hs = scored ? (typeof scored.hole_scores === 'string' ? JSON.parse(scored.hole_scores) : scored.hole_scores) : {}
+          const total = hs['total'] != null
+            ? parseInt(hs['total'])
+            : Object.values(hs).reduce((a, v) => a + (parseInt(v)||0), 0)
+          const holesPlayed = hs['total'] != null ? 18 : Object.keys(hs).length
+          const { data: evPlayers } = { data: [] } // names resolved below
+          return {
+            player_id: t.id,
+            player_name: `Team ${t.team_number}`,
+            team_number: t.team_number,
+            player_ids: pids,
+            total_score: total || 0,
+            holes_completed: holesPlayed,
+            is_complete: scored?.is_complete || false,
+            hole_scores: hs,
+            not_started: !scored || total === 0,
+          }
+        })
 
-      // Merge all event players — scored ones get full data, unstarted get zeros
-      const allPlayers = (playersRes.data || []).map(ep => {
-        const sc = scoredMap[ep.player_id]
-        if (sc) return {
-          ...sc,
-          hole_scores: typeof sc.hole_scores === 'string' ? JSON.parse(sc.hole_scores) : (sc.hole_scores || {}),
-        }
-        return {
-          player_id: ep.player_id,
-          player_name: ep.name,
-          total_score: 0,
-          holes_completed: 0,
-          is_complete: false,
-          hole_scores: {},
-          not_started: true,
-        }
-      })
+        // Resolve member names
+        const { data: evPlayers } = await db('get_players_for_event', { event_id: ev.id })
+        const nameMap = {}
+        evPlayers?.forEach(p => { nameMap[p.player_id] = p.name })
+        const enriched = teamStandings.map(t => ({
+          ...t,
+          member_names: t.player_ids.map(pid => {
+            const n = nameMap[pid] || ''
+            const parts = n.trim().split(' ')
+            return parts.length > 1 ? `${parts[0]} ${parts[parts.length-1][0]}.` : n
+          }),
+        }))
 
-      setStandings(sortPlayersByScore(allPlayers, courseHoles))
+        setStandings(sortPlayersByScore(enriched, courseHoles))
+      } else {
+        // Stroke play — show all event players
+        const { data: playersRes } = await db('get_players_for_event', { event_id: ev.id })
+        const scoredMap = {}
+        ;(scoresRes.data || []).forEach(sc => { scoredMap[sc.player_id] = sc })
+
+        const allPlayers = (playersRes || []).map(ep => {
+          const sc = scoredMap[ep.player_id]
+          if (sc) return {
+            ...sc,
+            hole_scores: typeof sc.hole_scores === 'string' ? JSON.parse(sc.hole_scores) : (sc.hole_scores || {}),
+          }
+          return {
+            player_id: ep.player_id,
+            player_name: ep.name,
+            total_score: 0,
+            holes_completed: 0,
+            is_complete: false,
+            hole_scores: {},
+            not_started: true,
+          }
+        })
+        setStandings(sortPlayersByScore(allPlayers, courseHoles))
+      }
       setLastUpdated(new Date())
     } catch (err) {
       console.error('Leaderboard fetch error:', err)
@@ -250,9 +281,16 @@ function MiniView({ standings, par, currentPlayer }) {
             <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.8rem', fontWeight: 500, color: isMe ? 'var(--gold)' : 'var(--gray-500)' }}>
               {showPos ? sc.finishing_position : ''}
             </span>
-            <span style={{ fontSize: '0.875rem', fontWeight: 500, color: isMe ? 'var(--gold)' : 'var(--cream)' }}>
-              {fmtName(sc.player_name)}
-            </span>
+            <div>
+              <span style={{ fontSize: '0.875rem', fontWeight: 500, color: isMe ? 'var(--gold)' : 'var(--cream)' }}>
+                {fmtName(sc.player_name)}
+              </span>
+              {sc.member_names?.length > 0 && (
+                <div style={{ fontSize: '0.65rem', color: 'var(--gray-500)', fontFamily: 'var(--font-mono)', marginTop: 1 }}>
+                  {sc.member_names.join(' · ')}
+                </div>
+              )}
+            </div>
             <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.95rem', fontWeight: 500, textAlign: 'right', color: cls === 'score-under' ? 'var(--blue-birdie)' : cls === 'score-over' ? 'var(--red)' : 'var(--gray-300)' }}>
               {txt}
             </span>
