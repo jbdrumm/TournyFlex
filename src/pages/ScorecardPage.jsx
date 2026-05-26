@@ -532,14 +532,26 @@ function ScrambleScoreEntry({ event, roundInfo, player }) {
     const pids = typeof team.player_ids === 'string' ? JSON.parse(team.player_ids) : team.player_ids
     const course = getCourseForRound(event, day, round_time)
     const courseId = course?.id || null
-    // Save all team members with same hole scores
+    const holesCount = Object.keys(holeScores).length
+
+    // Convert per-hole strokes to {"total": vsPar} to match historical format
+    // This keeps scramble history stats consistent
+    let storageFormat = holeScores
+    if (holesCount >= 18 && holes.length > 0) {
+      const vsPar = Object.entries(holeScores).reduce((sum, [holeNum, score]) => {
+        const holeData = holes.find(h => h.hole_number === parseInt(holeNum))
+        return sum + (parseInt(score) || 0) - (holeData?.par || 4)
+      }, 0)
+      storageFormat = { total: vsPar }
+    }
+
     for (const pid of pids) {
       await db('upsert_round_score', {
         event_id: event.id, player_id: pid, course_id: courseId,
         day, round_time, is_scramble: true,
-        hole_scores: holeScores,
-        holes_completed: Object.keys(holeScores).length,
-        is_complete: Object.keys(holeScores).length >= 18,
+        hole_scores: storageFormat,
+        holes_completed: holesCount >= 18 ? 18 : holesCount,
+        is_complete: holesCount >= 18,
       })
     }
   }
