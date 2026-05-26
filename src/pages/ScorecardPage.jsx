@@ -451,7 +451,7 @@ function ScrambleScoreEntry({ event, roundInfo, player }) {
     setTeam({ ...myTeam, member_names: pids.map(pid => nameMap[pid] || pid) })
 
     // Load course holes
-    const course = getCourseForRound(event, day)
+    const course = getCourseForRound(event, day, round_time)
     const courseId = course?.id || null
     if (courseId) {
       const { data: h } = await db('get_course_holes', { course_id: courseId })
@@ -512,7 +512,7 @@ function ScrambleScoreEntry({ event, roundInfo, player }) {
   const saveToDb = async (holeScores) => {
     if (!team || !event) return
     const pids = typeof team.player_ids === 'string' ? JSON.parse(team.player_ids) : team.player_ids
-    const course = getCourseForRound(event, day)
+    const course = getCourseForRound(event, day, round_time)
     const courseId = course?.id || null
     // Save all team members with same hole scores
     for (const pid of pids) {

@@ -237,9 +237,20 @@ export function getActiveRound(status) {
   return STATUS_FLOW.find(s => s.status === status) || null
 }
 
-export function getCourseForRound(event, day) {
-  if (day === 'friday')   return { id: event.friday_course_id,   name: event.friday_course_name,   par: event.friday_par }
-  if (day === 'saturday') return { id: event.saturday_course_id, name: event.saturday_course_name, par: event.saturday_par }
-  if (day === 'sunday')   return { id: event.sunday_course_id,   name: event.sunday_course_name,   par: event.sunday_par }
+export function getCourseForRound(event, day, round_time = 'morning') {
+  if (day === 'friday') {
+    // Use PM course if split and afternoon round
+    if (round_time === 'afternoon' && event.friday_pm_course_id) {
+      return { id: event.friday_pm_course_id, name: event.friday_pm_course_name, par: event.friday_pm_par }
+    }
+    return { id: event.friday_course_id, name: event.friday_course_name, par: event.friday_par }
+  }
+  if (day === 'saturday') {
+    if (round_time === 'afternoon' && event.saturday_pm_course_id) {
+      return { id: event.saturday_pm_course_id, name: event.saturday_pm_course_name, par: event.saturday_pm_par }
+    }
+    return { id: event.saturday_course_id, name: event.saturday_course_name, par: event.saturday_par }
+  }
+  if (day === 'sunday') return { id: event.sunday_course_id, name: event.sunday_course_name, par: event.sunday_par }
   return null
 }

@@ -37,12 +37,16 @@ async function handleAction(sql, action, p = {}) {
     case 'get_current_event': {
       const rows = await sql`
         SELECT e.*,
-          cf.name as friday_course_name,   cf.par as friday_par,
-          cs.name as saturday_course_name, cs.par as saturday_par,
-          csun.name as sunday_course_name, csun.par as sunday_par
+          cf.name   as friday_course_name,    cf.par   as friday_par,
+          cfp.name  as friday_pm_course_name, cfp.par  as friday_pm_par,
+          cs.name   as saturday_course_name,  cs.par   as saturday_par,
+          csp.name  as saturday_pm_course_name, csp.par as saturday_pm_par,
+          csun.name as sunday_course_name,    csun.par as sunday_par
         FROM events e
         LEFT JOIN courses cf   ON cf.id   = e.friday_course_id
+        LEFT JOIN courses cfp  ON cfp.id  = e.friday_pm_course_id
         LEFT JOIN courses cs   ON cs.id   = e.saturday_course_id
+        LEFT JOIN courses csp  ON csp.id  = e.saturday_pm_course_id
         LEFT JOIN courses csun ON csun.id = e.sunday_course_id
         WHERE e.status != 'complete'
         ORDER BY e.event_date DESC LIMIT 1`

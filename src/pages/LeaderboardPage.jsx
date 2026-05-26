@@ -54,7 +54,7 @@ export default function LeaderboardPage() {
       const isScramble = roundInfo.round.includes('afternoon') || roundInfo.round === 'sunday_morning'
       const day = roundInfo.round.split('_')[0]
       const round_time = isScramble ? (roundInfo.round === 'sunday_morning' ? 'morning' : 'afternoon') : 'morning'
-      const course = getCourseForRound(ev, day)
+      const course = getCourseForRound(ev, day, round_time)
 
       const [holesRes, scoresRes] = await Promise.all([
         course?.id ? db('get_course_holes', { course_id: course.id }) : Promise.resolve({ data: [] }),

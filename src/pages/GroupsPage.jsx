@@ -271,14 +271,20 @@ export default function GroupsPage() {
                         Team {team.team_number}
                       </span>
                     </div>
-                    {(team.players || []).map(p => (
-                      <div key={p.player_id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '3px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                        <span style={{ width: 5, height: 5, borderRadius: '50%', flexShrink: 0, background: player?.id === p.player_id ? 'var(--gold)' : 'var(--green-mid)' }} />
-                        <span style={{ fontSize: '0.78rem', fontWeight: player?.id === p.player_id ? 600 : 400, color: player?.id === p.player_id ? 'var(--gold)' : 'var(--cream)' }}>
-                          {p.player_name}
-                        </span>
-                      </div>
-                    ))}
+                    {(team.players || []).map((p, pi) => {
+                      const rank = (team.finishing_positions || [])[pi]
+                      const minRank = Math.min(...(team.finishing_positions || [1]))
+                      const isCaptain = rank === minRank
+                      const isMe = player?.id === p.player_id
+                      return (
+                        <div key={p.player_id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '3px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.65rem', color: 'var(--gray-500)', minWidth: 18, textAlign: 'right', flexShrink: 0 }}>#{rank}</span>
+                          <span style={{ fontSize: '0.78rem', fontWeight: isMe ? 600 : 400, color: isMe ? 'var(--gold)' : 'var(--cream)' }}>
+                            {p.player_name}{isCaptain ? <span style={{ color: 'var(--gold)', fontSize: '0.65rem', marginLeft: 3 }}>(C)</span> : null}
+                          </span>
+                        </div>
+                      )
+                    })}
                   </div>
                 )
               })}
