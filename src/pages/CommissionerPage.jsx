@@ -726,6 +726,17 @@ function ScoresTab() {
           holes_completed: holesCompleted, is_complete: holesCompleted >= 18,
         })
       }
+      // Update local scores state so hole dots turn green immediately
+      const updatedScores = { ...scores }
+      for (const member of groupMembers) {
+        const holeScores = {}
+        holes.forEach(h => { holeScores[String(h.hole_number)] = h.par })
+        Object.entries(scores[member.player_id] || {}).forEach(([k, v]) => {
+          if (v) holeScores[k] = parseInt(v)
+        })
+        updatedScores[member.player_id] = holeScores
+      }
+      setScores(updatedScores)
       showToast(`Saved ${groupMembers.length} scorecards!`, 'success')
     }
     setSaving(false)
