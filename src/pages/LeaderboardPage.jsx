@@ -75,21 +75,36 @@ export default function LeaderboardPage() {
           // Get score from first team member who has one
           const scored = pids.map(pid => scoreMap[pid]).find(sc => sc?.hole_scores)
           const hs = scored ? (typeof scored.hole_scores === 'string' ? JSON.parse(scored.hole_scores) : scored.hole_scores) : {}
-          const total = hs['total'] != null
-            ? parseInt(hs['total'])
-            : Object.values(hs).reduce((a, v) => a + (parseInt(v)||0), 0)
-          const holesPlayed = hs['total'] != null ? 18 : Object.keys(hs).length
-          const { data: evPlayers } = { data: [] } // names resolved below
+          const holesPlayed = hs['total'] != null ? 18 : Object.keys(hs).filter(k => hs[k] != null).length
+
+          // For scramble: score is strokes vs par for holes played
+          // so leaderboard shows -3, E, +2 etc — not gross total vs full course par
+          let vsPar = 0
+          if (hs['total'] != null) {
+            // Historical format: single total already stored as +/- value
+            vsPar = parseInt(hs['total'])
+          } else {
+            // Per-hole format: sum (score - holePar) for each scored hole
+            Object.entries(hs).forEach(([holeNum, score]) => {
+              const holeData = courseHoles.find(h => h.hole_number === parseInt(holeNum))
+              vsPar += (parseInt(score) || 0) - (holeData?.par || 4)
+            })
+          }
+          const grossTotal = Object.values(hs).filter(v => v != null)
+            .reduce((a, v) => a + (parseInt(v)||0), 0)
+
           return {
             player_id: t.id,
             player_name: `Team ${t.team_number}`,
             team_number: t.team_number,
             player_ids: pids,
-            total_score: total || 0,
+            total_score: vsPar,           // +/- par for sorting and display
+            gross_total: grossTotal,       // raw strokes for detail view
             holes_completed: holesPlayed,
             is_complete: scored?.is_complete || false,
             hole_scores: hs,
-            not_started: !scored || total === 0,
+            is_scramble: true,
+            not_started: !scored || holesPlayed === 0,
           }
         })
 
@@ -264,8 +279,17 @@ function MiniView({ standings, par, currentPlayer }) {
           )
         }
 
-        const { txt, cls } = fmtVsPar(sc.total_score, par)
         const holesIn = sc.holes_completed || Object.keys(sc.hole_scores || {}).length
+        // Scramble: total_score is already +/- par; stroke play: total_score is gross
+        const { txt, cls } = sc.is_scramble
+          ? (() => {
+              const d = sc.total_score
+              if (!holesIn) return { txt: '–', cls: '' }
+              return d === 0 ? { txt: 'E', cls: 'score-even' }
+                : d < 0 ? { txt: String(d), cls: 'score-under' }
+                : { txt: `+${d}`, cls: 'score-over' }
+            })()
+          : fmtVsPar(sc.total_score, par)
         const thruTxt = sc.is_complete || holesIn >= 18 ? 'F' : String(holesIn || '–')
         const showPos = !sc.is_tied
 
@@ -432,7 +456,7 @@ function DetailView({ standings, holes, par, currentPlayer }) {
                     )
                   })()}
                   <td style={{ padding: '7px 6px', fontFamily: 'var(--font-mono)', fontSize: '0.85rem', fontWeight: 500, textAlign: 'right', background: rowBg, borderBottom: '1px solid var(--green-mid)', borderLeft: '2px solid var(--green-mid)' }}>
-                    {sc.total_score || '–'}
+                    {sc.is_scramble ? (sc.gross_total || '–') : (sc.total_score || '–')}
                   </td>
                   <td style={{
                     padding: '7px 6px', fontFamily: 'var(--font-mono)', fontSize: '0.85rem', fontWeight: 500, textAlign: 'right',

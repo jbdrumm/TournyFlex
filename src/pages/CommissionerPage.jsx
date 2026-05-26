@@ -823,11 +823,15 @@ function ScoresTab() {
         <div /> {/* blank cell */}
       </div>
 
-      {/* Course info */}
+      {/* Course info — matches scorecard header style */}
       {course?.name && (
-        <p className="text-xs text-muted text-mono" style={{ marginBottom: 10 }}>
-          {course.name} · Par {course.par}
-        </p>
+        <div style={{ marginBottom: 12, paddingBottom: 10, borderBottom: '1px solid var(--green-mid)' }}>
+          <p style={{ fontFamily: 'var(--font-mono)', fontSize: '0.62rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--gold)', marginBottom: 2 }}>
+            {def?.label}
+          </p>
+          <p style={{ fontWeight: 600, fontSize: '0.95rem' }}>{course.name}</p>
+          {course.par && <p className="text-xs text-muted">Par {course.par}</p>}
+        </div>
       )}
 
       {/* Group / Team selector */}
@@ -942,6 +946,16 @@ function ScoresTab() {
               </p>
               <p className="text-xs text-muted text-mono" style={{ marginTop: 2 }}>
                 Par {holePar} · Hdcp #{currentHoleData?.handicap_rank || '–'}
+                {(currentHoleData?.yardage_black || currentHoleData?.yardage_blue || currentHoleData?.yardage_white || currentHoleData?.yardage_red) && (
+                  <span style={{ marginLeft: 6 }}>
+                    {[
+                      currentHoleData.yardage_black && `⬛${currentHoleData.yardage_black}`,
+                      currentHoleData.yardage_blue  && `🔵${currentHoleData.yardage_blue}`,
+                      currentHoleData.yardage_white && `⚪${currentHoleData.yardage_white}`,
+                      currentHoleData.yardage_red   && `🔴${currentHoleData.yardage_red}`,
+                    ].filter(Boolean).join(' ')}
+                  </span>
+                )}
               </p>
             </div>
             <button onClick={() => setCurrentHole(h => Math.min(18, h + 1))} disabled={currentHole === 18}
