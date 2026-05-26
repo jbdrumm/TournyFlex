@@ -56,24 +56,12 @@ export default function HomePage() {
     <div className="page">
       <div className="container">
         <div style={{ paddingTop: 32, paddingBottom: 24, textAlign: 'center' }}>
+          {/* Golf icon — always visible */}
+          <div style={{ fontSize: '4rem', marginBottom: 8, lineHeight: 1 }}>⛳</div>
           <h1 style={{ lineHeight: 1.1 }}>{event?.name || 'Golf Outing'}</h1>
           {player ? (
             <div style={{ marginTop: 16 }}>
-              <p style={{ color: 'var(--green-bright)', fontSize: '0.9rem', marginBottom: 6 }}>Welcome back, <strong>{player.name}</strong></p>
-              {playerGroup && (() => {
-                const members = (playerGroup.players || []).map(p => p.name)
-                const row1 = members.slice(0, 2).join(', ')
-                const row2 = members.slice(2, 4).join(', ')
-                return (
-                  <div style={{ marginBottom: 10 }}>
-                    <p style={{ color: 'var(--gold)', fontSize: '0.8rem', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>
-                      Group {playerGroup.group_number}
-                    </p>
-                    <p style={{ color: 'var(--gray-300)', fontSize: '0.8rem' }}>{row1}</p>
-                    {row2 && <p style={{ color: 'var(--gray-300)', fontSize: '0.8rem' }}>{row2}</p>}
-                  </div>
-                )
-              })()}
+              <p style={{ color: 'var(--green-bright)', fontSize: '0.9rem', marginBottom: 12 }}>Welcome back, <strong>{player.name}</strong></p>
               <button className="btn btn-ghost btn-sm" onClick={signOutPlayer}>Sign Out</button>
             </div>
           ) : !isCommissioner && (
