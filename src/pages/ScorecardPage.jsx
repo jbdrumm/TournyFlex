@@ -321,7 +321,26 @@ export default function ScorecardPage() {
                   {saving ? 'Saving...' : 'Save & Next →'}
                 </button>
               ) : (
-                <button className="btn btn-primary btn-full" onClick={() => saveProgress(false)} disabled={saving}>
+                <button className="btn btn-primary btn-full"
+                  onClick={async () => {
+                    setSaving(true)
+                    // Commit hole 18 displayed value for all players being scored
+                    const committed = {}
+                    groupPlayers.forEach(member => {
+                      const existing = scores[member.player_id] || {}
+                      if (scoringFor[member.player_id]) {
+                        const holeVal = existing[String(currentHole)] ?? holePar
+                        committed[member.player_id] = { ...existing, [String(currentHole)]: holeVal }
+                      } else {
+                        committed[member.player_id] = existing
+                      }
+                    })
+                    setScores(committed)
+                    await saveProgress(true, committed)  // silent=true, modal handles feedback
+                    setSaving(false)
+                    setShowSubmitted(true)
+                  }}
+                  disabled={saving}>
                   {saving ? 'Saving...' : 'Save Hole 18 ✓'}
                 </button>
               )}
