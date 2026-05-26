@@ -583,8 +583,17 @@ function ScrambleScoreEntry({ event, roundInfo, player }) {
               <p style={{ fontFamily: 'var(--font-display)', fontSize: '1.5rem', fontWeight: 700, lineHeight: 1 }}>Hole {currentHole}</p>
               <p style={{ fontFamily: 'var(--font-mono)', fontSize: '0.68rem', color: 'var(--gray-500)', marginTop: 2 }}>
                 Par {holePar} · Hdcp #{currentHoleData?.handicap_rank || '–'}
-                {currentHoleData?.yardage_white ? ` · ${currentHoleData.yardage_white} yds` : ''}
               </p>
+              {currentHoleData && (currentHoleData.yardage_black || currentHoleData.yardage_blue || currentHoleData.yardage_white || currentHoleData.yardage_red) && (
+                <p style={{ fontFamily: 'var(--font-mono)', fontSize: '0.65rem', color: 'var(--gray-600)', marginTop: 1 }}>
+                  {[
+                    currentHoleData.yardage_black && `⬛ ${currentHoleData.yardage_black}`,
+                    currentHoleData.yardage_blue  && `🔵 ${currentHoleData.yardage_blue}`,
+                    currentHoleData.yardage_white && `⚪ ${currentHoleData.yardage_white}`,
+                    currentHoleData.yardage_red   && `🔴 ${currentHoleData.yardage_red}`,
+                  ].filter(Boolean).join(' · ')}
+                </p>
+              )}
             </div>
             <button onClick={() => setCurrentHole(h => Math.min(18, h + 1))} disabled={currentHole === 18}
               style={{ width: 44, height: 44, border: '1px solid var(--green-mid)', borderRadius: 'var(--radius)', background: 'var(--green-deep)', color: currentHole === 18 ? 'var(--gray-700)' : 'var(--cream)', fontSize: '1.4rem', cursor: currentHole === 18 ? 'default' : 'pointer' }}>›</button>
