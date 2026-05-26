@@ -52,16 +52,19 @@ export function sortPlayersByScore(scorecards, courseHoles = []) {
     return (a.player_name || '').localeCompare(b.player_name || '')
   })
 
-  // Assign positions — tied players (same score) share the first position number
-  // Position number only meaningful on the first player in a tied group
-  let pos = 1
+  // Assign positions — tied players share the first position number in their group
+  // Next non-tied player skips positions equal to tie group size
+  // e.g. 2-way tie at #4 → both show 4 (or blank), next player is #6
   return sorted.map((sc, idx) => {
-    if (idx > 0 && sorted[idx - 1].total_score === sc.total_score) {
-      return { ...sc, finishing_position: sorted[idx - 1].finishing_position, is_tied: true }
+    // Find start of this player's tie group (first player with same score)
+    let groupStart = idx
+    while (groupStart > 0 && sorted[groupStart - 1].total_score === sc.total_score &&
+           !sorted[groupStart - 1].not_started && !sc.not_started) {
+      groupStart--
     }
-    const result = { ...sc, finishing_position: pos, is_tied: false }
-    pos = idx + 2
-    return result
+    const position = groupStart + 1  // 1-based position of the tie group leader
+    const isTied = groupStart < idx  // not the first in the group
+    return { ...sc, finishing_position: position, is_tied: isTied }
   })
 }
 
