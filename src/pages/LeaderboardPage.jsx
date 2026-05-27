@@ -130,13 +130,25 @@ export default function LeaderboardPage() {
 
         const allPlayers = (playersRes || []).map(ep => {
           const sc = scoredMap[ep.player_id]
-          if (sc) return {
-            ...sc,
-            hole_scores: typeof sc.hole_scores === 'string' ? JSON.parse(sc.hole_scores) : (sc.hole_scores || {}),
-            // Use DB columns; fall back to computing from hole_scores for older records
-            total_score: sc.total_score || (sc.hole_scores ? Object.values(
-              typeof sc.hole_scores === 'string' ? JSON.parse(sc.hole_scores) : sc.hole_scores
-            ).reduce((a,v) => a+(parseInt(v)||0), 0) : 0),
+          if (sc) {
+            const hs = typeof sc.hole_scores === 'string' ? JSON.parse(sc.hole_scores) : (sc.hole_scores || {})
+            const holeEntries = Object.entries(hs).filter(([k]) => k !== 'total' && !isNaN(k))
+            // Compute vs-par for holes played (for mid-round accuracy)
+            const vsParLive = holeEntries.reduce((sum, [holeNum, score]) => {
+              const hd = courseHoles.find(h => h.hole_number === parseInt(holeNum))
+              return sum + (parseInt(score)||0) - (hd?.par || 4)
+            }, 0)
+            const grossTotal = sc.total_score || holeEntries.reduce((a,[,v]) => a+(parseInt(v)||0), 0)
+            // Use score_vs_par from DB if complete, otherwise use live calculation
+            const displayScore = (sc.is_complete && sc.score_vs_par != null)
+              ? sc.score_vs_par
+              : (holeEntries.length > 0 ? vsParLive : null)
+            return {
+              ...sc,
+              hole_scores: hs,
+              total_score: displayScore ?? 0,  // use vs-par for sort/display
+              gross_total: grossTotal,
+            }
           }
           return {
             player_id: ep.player_id,
@@ -284,16 +296,14 @@ function MiniView({ standings, par, currentPlayer }) {
         }
 
         const holesIn = sc.holes_completed || Object.keys(sc.hole_scores || {}).length
-        // Scramble: total_score is already +/- par; stroke play: total_score is gross
-        const { txt, cls } = sc.is_scramble
-          ? (() => {
-              const d = sc.total_score
-              if (!holesIn) return { txt: '–', cls: '' }
-              return d === 0 ? { txt: 'E', cls: 'score-even' }
-                : d < 0 ? { txt: String(d), cls: 'score-under' }
-                : { txt: `+${d}`, cls: 'score-over' }
-            })()
-          : fmtVsPar(sc.total_score, par)
+        // total_score is now always vs-par for both stroke and scramble
+        const { txt, cls } = (() => {
+          if (!holesIn && !sc.is_complete) return { txt: '–', cls: '' }
+          const d = sc.total_score
+          return d === 0 ? { txt: 'E', cls: 'score-even' }
+            : d < 0 ? { txt: String(d), cls: 'score-under' }
+            : { txt: `+${d}`, cls: 'score-over' }
+        })()
         const thruTxt = sc.is_complete || holesIn >= 18 ? 'F' : String(holesIn || '–')
         const showPos = !sc.is_tied
 
@@ -388,7 +398,7 @@ function DetailView({ standings, holes, par, currentPlayer }) {
                   )}
                 </React.Fragment>
               ))}
-              {['Tot', '+/–'].map((h, i) => (
+              {['IN', 'Tot', '+/–'].map((h, i) => (
                 <th key={h} style={{
                   padding: '5px 6px', textAlign: 'right', fontFamily: 'var(--font-mono)',
                   fontSize: '0.65rem', color: 'var(--gray-500)', fontWeight: 500,
@@ -403,18 +413,15 @@ function DetailView({ standings, holes, par, currentPlayer }) {
             {standings.map((sc, idx) => {
               const isMe = currentPlayer?.id === sc.player_id
               const holeScores = typeof sc.hole_scores === 'string' ? JSON.parse(sc.hole_scores) : (sc.hole_scores || {})
-              // Scramble: total_score IS already +/- par (vsPar). Don't subtract par again.
-              // Stroke play: total_score is gross strokes, use fmtVsPar normally.
+              // total_score is always vs-par now
               const holesIn = sc.holes_completed || Object.keys(holeScores).length
-              const { txt, cls } = sc.is_scramble
-                ? (() => {
-                    if (!holesIn) return { txt: '–', cls: '' }
-                    const d = sc.total_score
-                    return d === 0 ? { txt: 'E', cls: 'score-even' }
-                      : d < 0 ? { txt: String(d), cls: 'score-under' }
-                      : { txt: `+${d}`, cls: 'score-over' }
-                  })()
-                : fmtVsPar(sc.total_score, par)
+              const { txt, cls } = (() => {
+                if (!holesIn && !sc.is_complete) return { txt: '–', cls: '' }
+                const d = sc.total_score
+                return d === 0 ? { txt: 'E', cls: 'score-even' }
+                  : d < 0 ? { txt: String(d), cls: 'score-under' }
+                  : { txt: `+${d}`, cls: 'score-over' }
+              })()
               const thruTxt = sc.is_complete || holesIn >= 18 ? 'F' : String(holesIn)
               const rowBg = isMe ? 'rgba(201,168,76,0.08)' : idx % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.02)'
               const stickyBg = isMe ? 'rgba(201,168,76,0.12)' : idx % 2 === 0 ? 'var(--green-deep)' : 'var(--green-dark)'
@@ -477,7 +484,7 @@ function DetailView({ standings, holes, par, currentPlayer }) {
                     )
                   })()}
                   <td style={{ padding: '7px 6px', fontFamily: 'var(--font-mono)', fontSize: '0.85rem', fontWeight: 500, textAlign: 'right', background: rowBg, borderBottom: '1px solid var(--green-mid)', borderLeft: '2px solid var(--green-mid)' }}>
-                    {sc.is_scramble ? (sc.gross_total || '–') : (sc.total_score || '–')}
+                    {sc.gross_total || sc.total_score || '–'}
                   </td>
                   <td style={{
                     padding: '7px 6px', fontFamily: 'var(--font-mono)', fontSize: '0.85rem', fontWeight: 500, textAlign: 'right',
