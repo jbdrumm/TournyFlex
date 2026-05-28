@@ -401,7 +401,7 @@ function DetailView({ standings, holes, par, currentPlayer }) {
               ))}
               {['IN', 'Tot', '+/–'].map((h, i) => (
                 <th key={h} style={{
-                  padding: '5px 6px', textAlign: 'right', fontFamily: 'var(--font-mono)',
+                  padding: '5px 6px', textAlign: i === 0 ? 'center' : 'right', fontFamily: 'var(--font-mono)',
                   fontSize: '0.65rem', color: 'var(--gray-500)', fontWeight: 500,
                   background: 'var(--green-deep)',
                   borderLeft: i === 0 ? '2px solid var(--green-mid)' : 'none',
