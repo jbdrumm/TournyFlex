@@ -286,14 +286,16 @@ async function handleAction(sql, action, p = {}) {
 
     case 'get_combined_totals': {
       // Friday AM + Saturday AM totals for Sunday seeding
-      // Calculate total_score from hole_scores since column was dropped
       const rows = await sql`
         SELECT
           rs.player_id,
           p.name as player_name,
-          SUM((SELECT COALESCE(SUM(value::int), 0) FROM jsonb_each_text(rs.hole_scores))) as combined_score,
+          SUM(COALESCE(rs.total_score, 0)) as combined_score,
+          SUM(COALESCE(rs.score_vs_par, 0)) as combined_vs_par,
           MAX(CASE WHEN rs.day='friday' THEN rs.hole_scores END) as friday_holes,
           MAX(CASE WHEN rs.day='saturday' THEN rs.hole_scores END) as saturday_holes,
+          MAX(CASE WHEN rs.day='friday' THEN rs.total_score END) as friday_total,
+          MAX(CASE WHEN rs.day='saturday' THEN rs.total_score END) as saturday_total,
           COUNT(*) FILTER (WHERE rs.is_complete) as rounds_complete,
           COUNT(*) as rounds_entered
         FROM round_scores rs
@@ -369,7 +371,7 @@ async function handleAction(sql, action, p = {}) {
     case 'get_event_results': {
       const rows = await sql`
         SELECT rs.player_id, p.name as player_name,
-          SUM((SELECT COALESCE(SUM(value::int), 0) FROM jsonb_each_text(rs.hole_scores))) as combined_score
+          SUM(COALESCE(rs.total_score, 0)) as combined_score
         FROM round_scores rs
         JOIN players p ON p.id = rs.player_id
         WHERE rs.event_id = ${p.event_id}
@@ -533,22 +535,22 @@ async function handleAction(sql, action, p = {}) {
 
     
     case 'get_scramble_wins': {
-      // Find winning team per scramble round, credit those players with a win
+      // Find winning team per scramble round (lowest score_vs_par wins)
       const rows = await sql`
         WITH team_totals AS (
-          SELECT
+          SELECT DISTINCT ON (rs.event_id, rs.day, rs.round_time, rs.scramble_team_id)
             rs.event_id, rs.day, rs.round_time, rs.scramble_team_id,
-            (SELECT COALESCE(SUM(value::int),0) FROM jsonb_each_text(rs.hole_scores)) as total
+            rs.score_vs_par as total
           FROM round_scores rs
           WHERE rs.is_scramble = true
             AND rs.scramble_team_id IS NOT NULL
             AND rs.is_complete = true
+            AND rs.score_vs_par IS NOT NULL
         ),
         winners AS (
           SELECT DISTINCT ON (event_id, day, round_time)
             event_id, day, round_time, scramble_team_id
           FROM team_totals
-          WHERE total > 0
           ORDER BY event_id, day, round_time, total ASC
         )
         SELECT
