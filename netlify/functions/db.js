@@ -224,16 +224,14 @@ async function handleAction(sql, action, p = {}) {
           rs.id, rs.event_id, rs.player_id, rs.course_id,
           rs.day, rs.round_time, rs.is_scramble,
           rs.hole_scores, rs.holes_completed, rs.is_complete,
-          rs.scramble_team_id, rs.created_at,
-          p.name as player_name,
-          (SELECT COALESCE(SUM(value::int), 0)
-           FROM jsonb_each_text(rs.hole_scores)) as total_score
+          rs.scramble_team_id, rs.total_score, rs.score_vs_par,
+          rs.created_at, p.name as player_name
         FROM round_scores rs
         JOIN players p ON p.id = rs.player_id
         WHERE rs.event_id = ${p.event_id}
           AND rs.day = ${p.day}
           AND rs.round_time = ${p.round_time}
-        ORDER BY total_score ASC NULLS LAST`
+        ORDER BY rs.total_score ASC NULLS LAST`
       return { data: rows }
     }
 
@@ -242,9 +240,7 @@ async function handleAction(sql, action, p = {}) {
         SELECT
           id, event_id, player_id, course_id, day, round_time,
           is_scramble, hole_scores, holes_completed, is_complete,
-          scramble_team_id, created_at,
-          (SELECT COALESCE(SUM(value::int), 0)
-           FROM jsonb_each_text(hole_scores)) as total_score
+          scramble_team_id, total_score, score_vs_par, created_at
         FROM round_scores
         WHERE event_id = ${p.event_id}
           AND player_id = ${p.player_id}

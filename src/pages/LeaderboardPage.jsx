@@ -132,21 +132,22 @@ export default function LeaderboardPage() {
           const sc = scoredMap[ep.player_id]
           if (sc) {
             const hs = typeof sc.hole_scores === 'string' ? JSON.parse(sc.hole_scores) : (sc.hole_scores || {})
-            const holeEntries = Object.entries(hs).filter(([k]) => k !== 'total' && !isNaN(k))
-            // Compute vs-par for holes played (for mid-round accuracy)
+            const holeEntries = Object.entries(hs).filter(([k]) => !isNaN(k))
+            // For in-progress: compute live vs-par from per-hole data
             const vsParLive = holeEntries.reduce((sum, [holeNum, score]) => {
               const hd = courseHoles.find(h => h.hole_number === parseInt(holeNum))
               return sum + (parseInt(score)||0) - (hd?.par || 4)
             }, 0)
-            const grossTotal = sc.total_score || holeEntries.reduce((a,[,v]) => a+(parseInt(v)||0), 0)
-            // Use score_vs_par from DB if complete, otherwise use live calculation
-            const displayScore = (sc.is_complete && sc.score_vs_par != null)
+            const grossFromHoles = holeEntries.reduce((a,[,v]) => a+(parseInt(v)||0), 0)
+            const grossTotal = sc.total_score || grossFromHoles
+            // Use score_vs_par from DB when available, else compute from hole data
+            const displayScore = sc.score_vs_par != null
               ? sc.score_vs_par
               : (holeEntries.length > 0 ? vsParLive : null)
             return {
               ...sc,
               hole_scores: hs,
-              total_score: displayScore ?? 0,  // use vs-par for sort/display
+              total_score: displayScore ?? 0,
               gross_total: grossTotal,
             }
           }
