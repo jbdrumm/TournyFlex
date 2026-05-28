@@ -20,9 +20,6 @@ export default function HomePage() {
   const [showSponsor, setShowSponsor] = useState(() => {
     try { return localStorage.getItem('showSponsor') !== 'false' } catch { return true }
   })
-  const [showSponsor, setShowSponsor] = useState(() => {
-    try { return localStorage.getItem('showSponsor') !== 'false' } catch { return true }
-  })
   const [dbError, setDbError] = useState(null)
   const { player, isCommissioner, signOutPlayer } = useAuth()
   const navigate = useNavigate()
