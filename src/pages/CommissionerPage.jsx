@@ -589,6 +589,7 @@ function PlayersTab() {
 
 // ─── SCORES TAB ───────────────────────────────────────────────────────────────
 function ScoresTab() {
+  const { confirm } = useConfirm()
   const ALL_ROUNDS = [
     { key: 'friday_morning',    day: 'friday',   rt: 'morning',   label: 'Fri AM Singles',  is_scramble: false },
     { key: 'friday_afternoon',  day: 'friday',   rt: 'afternoon', label: 'Fri PM Scramble', is_scramble: true  },
