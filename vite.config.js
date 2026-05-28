@@ -8,6 +8,10 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'favicon-32x32.png', 'apple-touch-icon.png'],
+      workbox: {
+        skipWaiting: true,      // new SW activates immediately on install
+        clientsClaim: true,     // new SW takes control of all open tabs instantly
+      },
       manifest: {
         name: 'TournyFlex',
         short_name: 'TournyFlex',
