@@ -1176,15 +1176,26 @@ function ScoresTab() {
               { label: 'Fri PM', round: 'friday_afternoon' },
               { label: 'Sat PM', round: 'saturday_afternoon' },
               { label: 'Sunday', round: 'sunday_morning' },
-            ].map(r => (
+              { label: 'Sponsor', round: null },
+            ].map(r => r.round ? (
               <button key={r.round}
                 onClick={async () => {
                   if (!window.confirm(`Delete ${r.label} teams for ${event.year}?`)) return
-                  const result = await db('reset_scramble_teams', { event_id: event.id, round: r.round })
+                  await db('reset_scramble_teams', { event_id: event.id, round: r.round })
                   showToast(`${r.label} teams deleted`, 'success')
                 }}
                 style={{ padding: '7px 2px', border: '1px solid rgba(214,69,69,0.4)', borderRadius: 'var(--radius)', background: 'transparent', color: 'var(--red)', fontFamily: 'var(--font-body)', fontSize: '0.68rem', cursor: 'pointer', textAlign: 'center' }}>
                 Reset {r.label}
+              </button>
+            ) : (
+              <button key="sponsor"
+                onClick={() => {
+                  const cur = localStorage.getItem('showSponsor') !== 'false'
+                  localStorage.setItem('showSponsor', cur ? 'false' : 'true')
+                  showToast(`Sponsor ${cur ? 'hidden' : 'shown'}`, 'success')
+                }}
+                style={{ padding: '7px 2px', border: '1px solid rgba(201,168,76,0.4)', borderRadius: 'var(--radius)', background: 'transparent', color: 'var(--gold)', fontFamily: 'var(--font-body)', fontSize: '0.68rem', cursor: 'pointer', textAlign: 'center' }}>
+                Toggle Sponsor
               </button>
             ))}
           </div>

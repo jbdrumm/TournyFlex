@@ -17,6 +17,12 @@ const STATUS_BADGE = {
 export default function HomePage() {
   const [event, setEvent] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [showSponsor, setShowSponsor] = useState(() => {
+    try { return localStorage.getItem('showSponsor') !== 'false' } catch { return true }
+  })
+  const [showSponsor, setShowSponsor] = useState(() => {
+    try { return localStorage.getItem('showSponsor') !== 'false' } catch { return true }
+  })
   const [dbError, setDbError] = useState(null)
   const { player, isCommissioner, signOutPlayer } = useAuth()
   const navigate = useNavigate()
@@ -61,8 +67,7 @@ export default function HomePage() {
           <h1 style={{ lineHeight: 1.1 }}>{event?.name || 'Golf Outing'}</h1>
           {player ? (
             <div style={{ marginTop: 16 }}>
-              <p style={{ color: 'var(--green-bright)', fontSize: '0.9rem', marginBottom: 12 }}>Welcome back, <strong>{player.name}</strong></p>
-              <button className="btn btn-ghost btn-sm" onClick={signOutPlayer}>Sign Out</button>
+              <p style={{ color: 'var(--green-bright)', fontSize: '0.9rem', marginBottom: 4 }}>Welcome back, <strong>{player.name}</strong></p>
             </div>
           ) : !isCommissioner && (
             <button className="btn btn-primary" style={{ marginTop: 16 }} onClick={() => navigate('/player-login')}>Sign In with PIN</button>
@@ -145,11 +150,29 @@ export default function HomePage() {
               </div>
             )}
 
+            {/* Sponsor block */}
+            {showSponsor && (
+              <div style={{ textAlign: 'center', padding: '20px 16px 8px', borderTop: '1px solid var(--green-mid)', marginTop: 16 }}>
+                <p style={{ fontFamily: 'var(--font-mono)', fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--gray-500)', marginBottom: 10 }}>Brought to you by</p>
+                <img src="/sponsor-logo.webp" alt="Sponsor" style={{ maxWidth: 180, opacity: 0.85 }} />
+              </div>
+            )}
+
+            {/* Sign out — bottom of page, above commissioner login */}
+            {player && (
+              <div style={{ textAlign: 'center', marginTop: 16 }}>
+                <button className="btn btn-ghost btn-sm" onClick={signOutPlayer}>Sign Out</button>
+              </div>
+            )}
+
             {!isCommissioner && (
-              <div style={{ textAlign: 'center', marginTop: 24 }}>
+              <div style={{ textAlign: 'center', marginTop: 8 }}>
                 <button className="btn btn-ghost btn-sm" onClick={() => navigate('/login')} style={{ color: 'var(--gray-500)', fontSize: '0.75rem' }}>🔑 Commissioner Login</button>
               </div>
             )}
+            <p style={{ textAlign: 'center', fontSize: '0.6rem', color: 'var(--gray-700)', paddingBottom: 24, paddingTop: 8, fontFamily: 'var(--font-mono)' }}>
+              Developed by HomeBase Applications
+            </p>
           </>
         )}
       </div>
