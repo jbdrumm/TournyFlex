@@ -588,6 +588,20 @@ async function handleAction(sql, action, p = {}) {
       return { data: { deleted: result.length } }
     }
 
+
+    case 'get_setting': {
+      const rows = await sql`
+        SELECT value FROM app_settings WHERE key = ${p.key} LIMIT 1`
+      return { data: rows[0]?.value ?? null }
+    }
+
+    case 'set_setting': {
+      await sql`
+        INSERT INTO app_settings (key, value) VALUES (${p.key}, ${p.value})
+        ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`
+      return { data: { ok: true } }
+    }
+
     default:
       throw new Error(`Unknown action: ${action}`)
   }

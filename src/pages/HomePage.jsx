@@ -17,9 +17,7 @@ const STATUS_BADGE = {
 export default function HomePage() {
   const [event, setEvent] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [showSponsor, setShowSponsor] = useState(() => {
-    try { return localStorage.getItem('showSponsor') !== 'false' } catch { return true }
-  })
+  const [showSponsor, setShowSponsor] = useState(true)  // loaded from DB
   const [dbError, setDbError] = useState(null)
   const { player, isCommissioner, signOutPlayer } = useAuth()
   const navigate = useNavigate()
@@ -29,6 +27,11 @@ export default function HomePage() {
   useEffect(() => { fetchEvent() }, [])
 
   const fetchEvent = async () => {
+    // Load sponsor visibility from DB
+    try {
+      const { data: sponsorVal } = await db('get_setting', { key: 'show_sponsor' })
+      if (sponsorVal !== null) setShowSponsor(sponsorVal !== 'false')
+    } catch {}
     setDbError(null)
     try {
       const { data } = await db('get_current_event')

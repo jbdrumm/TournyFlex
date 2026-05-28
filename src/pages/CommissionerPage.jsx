@@ -1182,10 +1182,11 @@ function ScoresTab() {
               </button>
             ) : (
               <button key="sponsor"
-                onClick={() => {
-                  const cur = localStorage.getItem('showSponsor') !== 'false'
-                  localStorage.setItem('showSponsor', cur ? 'false' : 'true')
-                  showToast(`Sponsor ${cur ? 'hidden' : 'shown'}`, 'success')
+                onClick={async () => {
+                  const { data: cur } = await db('get_setting', { key: 'show_sponsor' })
+                  const next = cur === 'false' ? 'true' : 'false'
+                  await db('set_setting', { key: 'show_sponsor', value: next })
+                  showToast(`Sponsor ${next === 'false' ? 'hidden' : 'shown'} — reload home page to see`, 'success')
                 }}
                 style={{ padding: '7px 2px', border: '1px solid rgba(201,168,76,0.4)', borderRadius: 'var(--radius)', background: 'transparent', color: 'var(--gold)', fontFamily: 'var(--font-body)', fontSize: '0.68rem', cursor: 'pointer', textAlign: 'center' }}>
                 Toggle Sponsor
