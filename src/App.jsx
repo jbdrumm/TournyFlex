@@ -1,6 +1,8 @@
+import { useState } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './contexts/AuthContext'
 import BottomNav from './components/BottomNav'
+import SplashScreen from './components/SplashScreen'
 import HomePage from './pages/HomePage'
 import LeaderboardPage from './pages/LeaderboardPage'
 import ScorecardPage from './pages/ScorecardPage'
@@ -12,16 +14,15 @@ import PlayerLoginPage from './pages/PlayerLoginPage'
 
 export default function App() {
   const { loading } = useAuth()
-
-  if (loading) return (
-    <div className="loading-screen">
-      <div className="spinner" />
-      <p className="text-muted text-sm">Loading...</p>
-    </div>
-  )
+  const [splashDone, setSplashDone] = useState(false)
 
   return (
     <>
+      {/* Splash shown on cold start; fades out once AuthContext finishes loading */}
+      {!splashDone && (
+        <SplashScreen ready={!loading} onDone={() => setSplashDone(true)} />
+      )}
+
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/leaderboard" element={<LeaderboardPage />} />
