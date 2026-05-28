@@ -7,18 +7,21 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'apple-touch-icon.png'],
+      includeAssets: ['favicon.ico', 'favicon-32x32.png', 'apple-touch-icon.png'],
       manifest: {
-        name: 'Golf Outing',
-        short_name: 'Golf',
-        description: 'Annual Men\'s Golf Outing App',
+        name: 'TournyFlex',
+        short_name: 'TournyFlex',
+        description: 'Tournament scoring and management app',
         theme_color: '#1a3a1a',
         background_color: '#0f1f0f',
         display: 'standalone',
         orientation: 'portrait',
+        start_url: '/',
+        scope: '/',
         icons: [
-          { src: 'pwa-192x192.png', sizes: '192x192', type: 'image/png' },
-          { src: 'pwa-512x512.png', sizes: '512x512', type: 'image/png' }
+          { src: 'pwa-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+          { src: 'pwa-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+          { src: 'pwa-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' }
         ]
       }
     })
