@@ -52,6 +52,7 @@ export default function CommissionerPage() {
 
 // ─── EVENT TAB ────────────────────────────────────────────────────────────────
 function EventTab() {
+  const { confirm } = useConfirm()
   const [events, setEvents] = useState([])
   const [courses, setCourses] = useState([])
   const [selectedEventId, setSelectedEventId] = useState(null)
