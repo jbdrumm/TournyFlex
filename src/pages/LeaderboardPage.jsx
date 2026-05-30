@@ -36,6 +36,7 @@ export default function LeaderboardPage() {
   const [loading, setLoading] = useState(true)
   const [lastUpdated, setLastUpdated] = useState(null)
   const [refreshKey, setRefreshKey] = useState(0)
+  const [boardHidden, setBoardHidden] = useState(false)
   const [view, setView] = useState('mini')
   const [dbError, setDbError] = useState(null) // 'mini' | 'detail'
   const [currentPlayer] = useState(() => {
@@ -55,6 +56,14 @@ export default function LeaderboardPage() {
       const day = roundInfo.round.split('_')[0]
       const round_time = isScramble ? (roundInfo.round === 'sunday_morning' ? 'morning' : 'afternoon') : 'morning'
       const course = getCourseForRound(ev, day, round_time)
+
+      // Check if board is hidden for current scramble round
+      if (isScramble) {
+        const { data: hideSetting } = await db('get_setting', { key: 'hide_scramble_board' })
+        setBoardHidden(hideSetting === 'true')
+      } else {
+        setBoardHidden(false)
+      }
 
       const [holesRes, scoresRes] = await Promise.all([
         course?.id ? db('get_course_holes', { course_id: course.id }) : Promise.resolve({ data: [] }),
@@ -236,6 +245,16 @@ export default function LeaderboardPage() {
           <p className="text-muted text-sm" style={{ marginBottom: 8 }}>Error loading leaderboard</p>
           <p className="text-xs" style={{ fontFamily: 'var(--font-mono)', color: 'var(--red)', wordBreak: 'break-all', padding: '0 16px' }}>{dbError}</p>
           <button className="btn btn-ghost btn-sm" style={{ marginTop: 12 }} onClick={() => { setDbError(null); fetchData() }}>Retry</button>
+        </div>
+      ) : boardHidden ? (
+        <div style={{ textAlign: 'center', padding: '48px 24px' }}>
+          <p style={{ fontSize: '2rem', marginBottom: 12 }}>🏌️</p>
+          <p style={{ color: 'var(--cream)', fontFamily: 'var(--font-body)', fontSize: '0.95rem', fontWeight: 600, marginBottom: 8 }}>
+            Leaderboard Hidden
+          </p>
+          <p className="text-muted text-sm" style={{ maxWidth: 260, margin: '0 auto', lineHeight: 1.5 }}>
+            Leaderboard hidden until round completed by all teams.
+          </p>
         </div>
       ) : standings.length === 0 ? (
         <div style={{ textAlign: 'center', padding: 48 }}>

@@ -1165,14 +1165,26 @@ function ScoresTab() {
               </button>
             ))}
           </div>
-          <p className="text-xs text-muted" style={{ marginBottom: 8 }}>Delete scramble teams:</p>
+          <p className="text-xs text-muted" style={{ marginBottom: 8 }}>Delete scramble teams / toggles:</p>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 5 }}>
             {[
               { label: 'Fri PM', round: 'friday_afternoon' },
               { label: 'Sat PM', round: 'saturday_afternoon' },
               { label: 'Sunday', round: 'sunday_morning' },
               { label: 'Sponsor', round: null },
-            ].map(r => r.round ? (
+              { label: 'Board', round: 'board' },
+            ].map(r => r.round === 'board' ? (
+              <button key="board"
+                onClick={async () => {
+                  const { data: cur } = await db('get_setting', { key: 'hide_scramble_board' })
+                  const next = cur === 'true' ? 'false' : 'true'
+                  await db('set_setting', { key: 'hide_scramble_board', value: next })
+                  showToast(`Scramble board ${next === 'true' ? 'hidden' : 'visible'} — players will see change on next refresh`, 'success')
+                }}
+                style={{ padding: '7px 2px', border: '1px solid rgba(201,168,76,0.4)', borderRadius: 'var(--radius)', background: 'transparent', color: 'var(--gold)', fontFamily: 'var(--font-body)', fontSize: '0.68rem', cursor: 'pointer', textAlign: 'center' }}>
+                Hide Board
+              </button>
+            ) : r.round ? (
               <button key={r.round}
                 onClick={async () => {
                   if (!await confirm({ title: `Reset ${r.label} Teams`, message: `Delete ${r.label} teams for ${event.year}?`, ok: 'Delete', danger: true })) return
