@@ -194,7 +194,7 @@ export default function ScorecardPage() {
   // Afternoon scramble — show team score entry
   const isScramble = roundInfo?.round?.includes('afternoon') || roundInfo?.round === 'sunday_morning'
   if (isScramble && player) {
-    return <ScrambleScoreEntry event={event} roundInfo={roundInfo} player={player} />
+    return <ScrambleScoreEntry event={event} roundInfo={roundInfo} player={player} isCommissioner={isCommissioner} />
   }
 
   if (!isStrokePlay) return (
@@ -205,7 +205,7 @@ export default function ScorecardPage() {
   )
 
   const activeScoring = groupPlayers.filter(m => scoringFor[m.player_id])
-  const scoresLocked = event?.scores_locked === true
+  const scoresLocked = event?.scores_locked === true && !isCommissioner
 
   return (
     <div className="page">
@@ -440,7 +440,7 @@ function SubmittedModal({ onDone }) {
 }
 
 // ── SCRAMBLE SCORE ENTRY — hole-by-hole, single team score per hole ──────────
-function ScrambleScoreEntry({ event, roundInfo, player }) {
+function ScrambleScoreEntry({ event, roundInfo, player, isCommissioner }) {
   const navigate = useNavigate()
   const [team, setTeam] = useState(null)
   const [holes, setHoles] = useState([])
@@ -449,6 +449,8 @@ function ScrambleScoreEntry({ event, roundInfo, player }) {
   const [saving, setSaving] = useState(false)
   const [showSubmitted, setShowSubmitted] = useState(false)
   const [toast, setToast] = useState(null)
+
+  const scoresLocked = event?.scores_locked === true && !isCommissioner
 
   const day = roundInfo?.round?.split('_')[0]
   const round_time = roundInfo?.round?.includes('afternoon') ? 'afternoon' : 'morning'
@@ -666,7 +668,7 @@ function ScrambleScoreEntry({ event, roundInfo, player }) {
           <div style={{ height: 1, background: 'var(--green-mid)', margin: '8px 0 12px' }} />
 
           {/* Locked banner */}
-          {event?.scores_locked && (
+          {scoresLocked && (
             <div style={{ textAlign: 'center', padding: '10px 12px', background: 'rgba(201,168,76,0.08)', border: '1px solid rgba(201,168,76,0.25)', borderRadius: 'var(--radius)', marginBottom: 10 }}>
               <p style={{ fontSize: '0.8rem', color: 'var(--gold)', fontWeight: 600 }}>🔒 Scores Locked</p>
               <p style={{ fontSize: '0.72rem', color: 'var(--gray-500)', marginTop: 2 }}>Viewing only — the commissioner has locked score entry.</p>
@@ -675,11 +677,11 @@ function ScrambleScoreEntry({ event, roundInfo, player }) {
 
           {/* Action row */}
           {currentHole < 18 ? (
-            <button className="btn btn-primary btn-full" onClick={saveAndNext} disabled={saving || event?.scores_locked}>
+            <button className="btn btn-primary btn-full" onClick={saveAndNext} disabled={saving || scoresLocked}>
               {saving ? 'Saving...' : 'Save & Next →'}
             </button>
           ) : (
-            <button className="btn btn-primary btn-full" onClick={saveHole18} disabled={saving || event?.scores_locked}>
+            <button className="btn btn-primary btn-full" onClick={saveHole18} disabled={saving || scoresLocked}>
               {saving ? 'Saving...' : 'Save Hole 18 ✓'}
             </button>
           )}
