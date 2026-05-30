@@ -58,9 +58,11 @@ export default function LeaderboardPage() {
       const course = getCourseForRound(ev, day, round_time)
 
       // Check if board is hidden for current scramble round
+      let currentlyHidden = false
       if (isScramble) {
         const { data: hideSetting } = await db('get_setting', { key: 'hide_scramble_board' })
-        setBoardHidden(hideSetting === 'true')
+        currentlyHidden = hideSetting === 'true'
+        setBoardHidden(currentlyHidden)
       } else {
         setBoardHidden(false)
       }
@@ -132,7 +134,8 @@ export default function LeaderboardPage() {
         setStandings(sortPlayersByScore(enriched, courseHoles))
 
         // Auto-reveal: if board was hidden but all teams are now complete, clear the setting
-        if (boardHidden && enriched.length > 0 && enriched.every(t => t.is_complete)) {
+        // Use holesPlayed >= 18 as fallback in case is_complete flag wasn't set
+        if (currentlyHidden && enriched.length > 0 && enriched.every(t => t.is_complete || t.holes_completed >= 18)) {
           await db('set_setting', { key: 'hide_scramble_board', value: 'false' })
           setBoardHidden(false)
         }
