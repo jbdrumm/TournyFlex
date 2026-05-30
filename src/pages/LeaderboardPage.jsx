@@ -386,7 +386,9 @@ function DetailView({ standings, holes, par, currentPlayer }) {
     if (d === -1) return 'birdie'
     if (d === 0)  return 'par'
     if (d === 1)  return 'bogey'
-    return 'double'
+    if (d === 2)  return 'double'
+    if (d === 3)  return 'triple'
+    return 'quad'
   }
 
   const holeStyle = {
@@ -395,6 +397,8 @@ function DetailView({ standings, holes, par, currentPlayer }) {
     par:    { color: 'var(--gray-300)' },
     bogey:  { border: '1.5px solid var(--red)', borderRadius: 2, color: 'var(--cream)' },
     double: { background: 'var(--red)', borderRadius: 2, color: 'white' },
+    triple: { background: '#7a1a1a', borderRadius: 2, color: 'white' },
+    quad:   { background: '#111111', borderRadius: 2, color: 'white' },
     empty:  { color: 'var(--gray-700)', opacity: 0.5 },
   }
 
@@ -591,6 +595,8 @@ function DetailView({ standings, holes, par, currentPlayer }) {
           ['par',    { color: 'var(--gray-300)' }, 'E'],
           ['bogey',  { border: '1.5px solid var(--red)', borderRadius: 2, color: 'var(--cream)' }, '+1'],
           ['double', { background: 'var(--red)', borderRadius: 2, color: 'white' }, '+2'],
+          ['triple', { background: '#7a1a1a', borderRadius: 2, color: 'white' }, '+3'],
+          ['quad+',  { background: '#111111', borderRadius: 2, color: 'white' }, '+4'],
         ].map(([label, st, score]) => (
           <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
             <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 18, height: 18, fontSize: '0.65rem', fontWeight: 500, fontFamily: 'var(--font-mono)', ...st }}>
