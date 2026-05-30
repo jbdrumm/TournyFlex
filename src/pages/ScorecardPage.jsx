@@ -21,7 +21,7 @@ export default function ScorecardPage() {
   const [activeTab, setActiveTab] = useState('manual')
   const [showSubmitted, setShowSubmitted] = useState(false)
 
-  useEffect(() => { fetchSetup() }, [player])
+  useEffect(() => { fetchSetup() }, [player?.id])
 
   const fetchSetup = async () => {
     try {
@@ -49,10 +49,14 @@ export default function ScorecardPage() {
           : [{ player_id: player.id, name: player.name }]
         setGroupPlayers(members)
 
-        // Default: only score for yourself
-        const defaultScoring = {}
-        members.forEach(m => { defaultScoring[m.player_id] = m.player_id === player.id })
-        setScoringFor(defaultScoring)
+        // Default: only score for yourself — only set if not already initialized
+        // This prevents Android re-renders from resetting user's checkbox selections
+        setScoringFor(prev => {
+          if (Object.keys(prev).length > 0) return prev
+          const defaultScoring = {}
+          members.forEach(m => { defaultScoring[m.player_id] = m.player_id === player.id })
+          return defaultScoring
+        })
 
         if (course?.id) await loadGroupScores(ev, members, day, course.id)
       }
