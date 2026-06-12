@@ -16,8 +16,8 @@ Next, IN THIS ORDER (order matters — do not reorder 1->2):
 - [x] 2. Restore DONE — all 10 tables created clean
 - [x] 3. GATE 2 PASSED — round_scores 487, app_settings 2, players 26, courses 12, course_holes 180, events 7; round_scores 14 cols incl score_vs_par
 - [x] 4. GATE 2-bis PASSED — RLS enabled on all 10 (rowsecurity=t). Note: Neon's existing permissive policies (Public read / Anon insert/update/delete) also restored.
-- [ ] 5. Cutover — update Netlify DB connection-string env var: Neon -> Supabase
-- [ ] 6. GATE 3 — test a READ and a WRITE path against Supabase
+- [x] 5. CUTOVER DONE — Netlify DATABASE_URL -> Supabase (transaction pooler 6543); driver swapped to postgres.js; writes confirmed landing in Supabase
+- [~] 6. GATE 3 — WRITE confirmed (event create -> Supabase). Still verify: leaderboard READ, score upsert, scramble (JSON/array paths)
 - [ ] 7. Keep Neon intact as rollback until app is stable on Supabase
 - [ ] 8. Rotate GitHub token: new one with TournyFlex ORG access + `workflow`
         scope; revoke the old token; hand the new token to Claude
@@ -36,6 +36,21 @@ The Neon -> Supabase data migration succeeded via the
 10 tables; round_scores 487, app_settings 2, players 26, courses 12,
 course_holes 180, events 7; round_scores has all 14 columns incl score_vs_par;
 RLS enabled on all 10.
+
+
+**CUTOVER GOTCHA (cost ~30 min):** Netlify had **Auto Publishing LOCKED**. New
+deploys built successfully but did NOT go live — the published site stayed pinned
+to an OLD commit (pre-driver-swap), so the app kept running the Neon driver and
+writing to Neon even though DATABASE_URL was correctly set to Supabase. The tell:
+"Published main@<OLD hash>" did not match the latest deploy's hash. Fix: manually
+Publish the new deploy, then Unlock auto-publishing. ALWAYS check the *published*
+commit hash, not just "last deploy time", when a deploy seems not to take effect.
+
+**DRIVER NOTE:** app uses postgres.js (not @neondatabase/serverless) with
+`prepare:false` (required for Supabase transaction pooler on 6543). All ~40
+queries are tagged-template and ported unchanged. JSONB/array columns return
+pre-parsed (same as Neon), so the existing `typeof x === 'string' ? JSON.parse`
+guards pass through harmlessly.
 
 **Hard-won lesson — the uuid-ossp schema trap (cost two failed runs):**
 The Neon dump calls `public.uuid_generate_v4()` (schema-qualified to `public`).
