@@ -11,7 +11,7 @@ Done:
 - [x] Domain: tournyflex.com (Porkbun) — privacy + auto-renew + lock + 2FA
 
 Next, IN THIS ORDER (order matters — do not reorder 1->2):
-- [ ] 1. Enable extension FIRST: `create extension if not exists "uuid-ossp";`
+- [x] 1. Enable extension: `create extension if not exists "uuid-ossp";` — DONE
         (Supabase SQL editor) — restore FAILS without it (uuid_generate_v4 defaults)
 - [ ] 2. Restore the dump: `pg_restore` the .bak into Supabase
 - [ ] 3. GATE 2 — verify row counts vs Neon (487 round_scores, 2 app_settings, etc.)
