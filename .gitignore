@@ -1,0 +1,5 @@
+
+# Database dumps — contain all data, never commit
+*_dump.sql
+tournyflex_neon_dump.sql
+*.dump
