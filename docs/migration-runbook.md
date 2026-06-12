@@ -17,7 +17,7 @@ Next, IN THIS ORDER (order matters — do not reorder 1->2):
 - [x] 3. GATE 2 PASSED — round_scores 487, app_settings 2, players 26, courses 12, course_holes 180, events 7; round_scores 14 cols incl score_vs_par
 - [x] 4. GATE 2-bis PASSED — RLS enabled on all 10 (rowsecurity=t). Note: Neon's existing permissive policies (Public read / Anon insert/update/delete) also restored.
 - [x] 5. CUTOVER DONE — Netlify DATABASE_URL -> Supabase (transaction pooler 6543); driver swapped to postgres.js; writes confirmed landing in Supabase
-- [~] 6. GATE 3 — WRITE confirmed (event create -> Supabase). Still verify: leaderboard READ, score upsert, scramble (JSON/array paths)
+- [x] 6. GATE 3 PASSED — write, leaderboard read, score upsert, and scramble (JSON/array paths) all validated against Supabase
 - [ ] 7. Keep Neon intact as rollback until app is stable on Supabase
 - [ ] 8. Rotate GitHub token: new one with TournyFlex ORG access + `workflow`
         scope; revoke the old token; hand the new token to Claude
@@ -43,8 +43,13 @@ deploys built successfully but did NOT go live — the published site stayed pin
 to an OLD commit (pre-driver-swap), so the app kept running the Neon driver and
 writing to Neon even though DATABASE_URL was correctly set to Supabase. The tell:
 "Published main@<OLD hash>" did not match the latest deploy's hash. Fix: manually
-Publish the new deploy, then Unlock auto-publishing. ALWAYS check the *published*
-commit hash, not just "last deploy time", when a deploy seems not to take effect.
+Publish the new deploy. ALWAYS check the *published* commit hash, not just "last
+deploy time", when a deploy seems not to take effect.
+
+**Auto-publish is INTENTIONALLY LEFT LOCKED** — it serves as the deploy gate
+("no deploy to main without explicit approval" per CLAUDE.md). Every deploy must
+be manually published. This is by design; do NOT unlock it. A docs/code push
+builds but will not go live until manually published.
 
 **DRIVER NOTE:** app uses postgres.js (not @neondatabase/serverless) with
 `prepare:false` (required for Supabase transaction pooler on 6543). All ~40
