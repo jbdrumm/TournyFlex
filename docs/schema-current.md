@@ -30,8 +30,10 @@ Confirmed by `information_schema.tables`, June 2026:
 8. **scramble_teams**
 9. **round_scores** — the single score of record (see below).
 10. **app_settings** — **was NOT in either SQL file.** Live but undocumented.
-    Likely global config (possibly active-event / feature flags — ties to the
-    "global state lives in the DB, not localStorage" principle). Contents TBD.
+    Verified: a simple key/value store (`key text`, `value text`), **2 rows**.
+    Global config (e.g. active-event pointer / feature flag) — the DB-side
+    realization of "global state lives in the DB, not localStorage." Migrate
+    as-is; confirm the 2 keys' meaning when wiring the new home/event flow.
 
 **Resolved (no longer concerns):**
 - `scorecards` — **does not exist.** Already dropped. The v2 migration's
@@ -91,11 +93,16 @@ The live table is far richer than the SQL files describe. Confirmed columns:
 
 ## Outstanding verifications
 
-- **`app_settings` contents** — columns + row count + what it governs. (Query
-  pending.)
-- **`round_scores` row count** — confirm test-event data is present. (Query
-  pending.)
+- **`app_settings`** — DONE: key/value text, 2 rows (see above).
+- **`round_scores` row count** — DONE: **487 rows** (test-event data present).
 - **`combined_stroke_totals` view** — confirm dropped vs. elsewhere, during dump.
+  (Only remaining item; not a blocker.)
+
+## Data volume (for migration sizing)
+
+Small dataset — migrate-now is low risk. round_scores 487 rows; app_settings
+2 rows; remaining tables (courses, course_holes, events, players, etc.) are
+test-event scale. The entire DB is well within any free-tier import.
 
 ---
 
