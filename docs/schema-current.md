@@ -53,9 +53,8 @@ Confirmed by `information_schema.tables`, June 2026:
 - `scorecards` — **does not exist.** Already dropped. The v2 migration's
   commented-out `DROP TABLE scorecards` (or equivalent) was applied. There is
   **no two-score-table ambiguity** — `round_scores` is the sole score of record.
-- `combined_stroke_totals` view — **not present** in the public table/view list.
-  Either dropped, never created, or in another schema. Confirm during dump; not
-  a blocker.
+- `combined_stroke_totals` view — **CONFIRMED DOES NOT EXIST.** The PG17 dump
+  reported "no views." Never created or already dropped. Nothing to migrate.
 
 ---
 
@@ -109,8 +108,9 @@ The live table is far richer than the SQL files describe. Confirmed columns:
 
 - **`app_settings`** — DONE: key/value text, 2 rows (see above).
 - **`round_scores` row count** — DONE: **487 rows** (test-event data present).
-- **`combined_stroke_totals` view** — confirm dropped vs. elsewhere, during dump.
-  (Only remaining item; not a blocker.)
+- **`combined_stroke_totals` view** — DONE: dump confirmed NO views exist.
+
+**All schema items verified. No open unknowns remain.**
 
 ## Data volume (for migration sizing)
 
