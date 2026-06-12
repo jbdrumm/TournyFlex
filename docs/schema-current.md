@@ -30,10 +30,24 @@ Confirmed by `information_schema.tables`, June 2026:
 8. **scramble_teams**
 9. **round_scores** — the single score of record (see below).
 10. **app_settings** — **was NOT in either SQL file.** Live but undocumented.
-    Verified: a simple key/value store (`key text`, `value text`), **2 rows**.
-    Global config (e.g. active-event pointer / feature flag) — the DB-side
-    realization of "global state lives in the DB, not localStorage." Migrate
-    as-is; confirm the 2 keys' meaning when wiring the new home/event flow.
+    Verified: a key/value store (`key text`, `value text`), **2 rows**, holding
+    admin-toggleable boolean settings. The DB-side realization of "global state
+    lives in the DB, not localStorage." The 2 known keys:
+    - `hide_scramble_board` — admin hides the scramble leaderboard until all
+      teams finish (so groups can't see standings mid-round). This is an existing
+      production pattern for "admin toggles board visibility" — the side-game
+      scramble reader should REUSE this pattern, not invent a parallel one
+      (consistent with the default-closed visibility rule in CLAUDE.md).
+    - `show_sponsor` — toggles the sponsor image on/off. This is existing
+      advertising infrastructure; the Title/Event Sponsor ad model builds on it.
+      Placement rule still applies: never on the active scorecard.
+
+    **Multi-event gap:** `app_settings` is currently FLAT/GLOBAL, but both keys
+    are conceptually PER-EVENT (each admin toggles their own event). This works
+    only because there is one annual event today. Going multi-event requires
+    moving these to a per-event scope. Migrate as-is now; refactor to per-event
+    before multi-event launch. (Another instance of the single-event assumption
+    baked into the schema.)
 
 **Resolved (no longer concerns):**
 - `scorecards` — **does not exist.** Already dropped. The v2 migration's
