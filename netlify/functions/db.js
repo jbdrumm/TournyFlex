@@ -2,7 +2,24 @@
 // Central database API for the Golf Outing app — 3-day weekend format.
 // All queries from the frontend go through here. DATABASE_URL never leaves the server.
 
-const { neon } = require('@neondatabase/serverless')
+const postgres = require('postgres')
+
+// Single shared connection across warm invocations of this function instance.
+// Transaction pooler (Supabase, port 6543) does NOT support prepared statements,
+// so prepare:false is REQUIRED. Keep max low — serverless instances are many
+// and short-lived; the pooler multiplexes them.
+let _sql
+function getSql() {
+  if (!_sql) {
+    _sql = postgres(process.env.DATABASE_URL, {
+      prepare: false,   // required for Supabase transaction pooler (6543)
+      max: 1,           // one conn per warm instance; pooler handles fan-out
+      idle_timeout: 20,
+      connect_timeout: 10,
+    })
+  }
+  return _sql
+}
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -14,7 +31,7 @@ exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers: corsHeaders, body: '' }
   if (event.httpMethod !== 'POST') return { statusCode: 405, headers: corsHeaders, body: JSON.stringify({ error: 'Method not allowed' }) }
 
-  const sql = neon(process.env.DATABASE_URL)
+  const sql = getSql()
   let body
   try { body = JSON.parse(event.body) }
   catch { return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ error: 'Invalid JSON' }) } }
