@@ -1,0 +1,61 @@
+name: Neon to Supabase Migration
+
+on:
+  workflow_dispatch:
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install PostgreSQL 17 client
+        run: |
+          sudo sh -c 'echo "deb https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/postgresql.gpg
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client-17
+
+      - name: Verify client is v17
+        run: |
+          /usr/lib/postgresql/17/bin/pg_dump --version
+          /usr/lib/postgresql/17/bin/pg_restore --version
+
+      - name: Dump Neon (custom format)
+        env:
+          NEON_URL: ${{ secrets.NEON_DATABASE_URL }}
+        run: |
+          /usr/lib/postgresql/17/bin/pg_dump -Fc -v \
+            --no-owner --no-privileges --no-acl \
+            -d "$NEON_URL" -f neon.bak
+          echo "Dump file size:"; ls -lh neon.bak
+
+      - name: Restore into Supabase
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_DATABASE_URL }}
+        run: |
+          /usr/lib/postgresql/17/bin/pg_restore -v \
+            --no-owner --no-privileges --no-acl \
+            -d "$SUPABASE_URL" neon.bak || echo "pg_restore exited non-zero — review log above for real vs. harmless errors"
+
+      - name: Verify parity (row counts on Supabase)
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_DATABASE_URL }}
+        run: |
+          PSQL="/usr/lib/postgresql/17/bin/psql"
+          echo "=== table list (expect 10) ==="
+          $PSQL "$SUPABASE_URL" -c "select table_name from information_schema.tables where table_schema='public' order by 1;"
+          echo "=== row counts (expect: round_scores 487, app_settings 2) ==="
+          $PSQL "$SUPABASE_URL" -c "select 'round_scores' tbl, count(*) from round_scores union all select 'app_settings', count(*) from app_settings union all select 'players', count(*) from players union all select 'courses', count(*) from courses union all select 'course_holes', count(*) from course_holes union all select 'events', count(*) from events order by 1;"
+          echo "=== round_scores columns (expect 14, incl score_vs_par) ==="
+          $PSQL "$SUPABASE_URL" -c "select column_name from information_schema.columns where table_name='round_scores' order by ordinal_position;"
+
+      - name: Enable RLS on all migrated tables
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_DATABASE_URL }}
+        run: |
+          PSQL="/usr/lib/postgresql/17/bin/psql"
+          for t in courses course_holes events players event_players event_groups group_players scramble_teams round_scores app_settings; do
+            echo "Enabling RLS on $t"
+            $PSQL "$SUPABASE_URL" -c "alter table public.$t enable row level security;"
+          done
+          echo "=== confirm RLS enabled (rowsecurity=t for all 10) ==="
+          $PSQL "$SUPABASE_URL" -c "select tablename, rowsecurity from pg_tables where schemaname='public' order by tablename;"
