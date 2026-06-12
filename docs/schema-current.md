@@ -1,117 +1,128 @@
 # Current Schema Summary
 
-Status: **VERIFIED against live Neon database (2026-06-11).** This reflects the
-actual database, confirmed by querying `information_schema` directly — not the
-SQL files, which had drifted. This file is the source of truth. The two SQL
-files in `archive/` are historical reference only and are known to be stale.
+Status: **VERIFIED against live Neon (June 2026)** for the points below. Table
+list, `round_scores` columns, and the `scorecards`/view questions are confirmed
+by direct query. Remaining unknowns are flagged. This file is the source of
+truth for the database; the SQL files in `archive/` are historical reference only
+and are known to be **stale** (they understate `round_scores` and still describe
+a dropped table).
 
 Origin note: this schema was built for a **single annual 3-day outing** (the beta
-test event). It predates the multi-segment, multi-event, account-based direction
-in `CLAUDE.md`, `docs/side-games.md`, and `docs/account-less-players.md`. Those
-docs describe a **target** the current schema does not yet support — see
-"Design-doc gaps" at the end.
+test event), now inactive. It predates the multi-segment, multi-event,
+account-based direction in `CLAUDE.md` and the design docs. Several docs describe
+a **target** the current schema does not yet support — see "Design-doc gaps."
 
 ---
 
-## Verified state (queried live, not from files)
+## Verified live tables (10)
 
-**10 base tables, 0 views.** Full list:
-`app_settings`, `course_holes`, `courses`, `event_groups`, `event_players`,
-`events`, `group_players`, `players`, `round_scores`, `scramble_teams`.
+Confirmed by `information_schema.tables`, June 2026:
 
-Resolved during verification:
-- The `scorecards` table **no longer exists** — it was dropped. There is no
-  two-score-table ambiguity; `round_scores` is the single score of record.
-- The `combined_stroke_totals` **view does not exist** in the live DB (no views
-  at all). The earlier "view references missing columns" contradiction was a
-  file-only artifact — the view was never live or was dropped.
-- `round_scores` in the live DB has **14 columns**, not the 8 in the base SQL
-  file. The live table is the evolved, correct shape; the files are stale.
-- `app_settings` exists live but was **not in either SQL file** (drift). Contents
-  TBD — carry over in migration.
+1. **courses**
+2. **course_holes** — includes `handicap_rank` (per-hole stroke index 1–18).
+   This is the data net scoring needs; it exists.
+3. **events**
+4. **players** — PIN-only identity (`id`, `name`, `pin`, `created_at`).
+   No email/password/auth. This is the entire identity model today.
+5. **event_players**
+6. **event_groups** (v2)
+7. **group_players** (v2)
+8. **scramble_teams**
+9. **round_scores** — the single score of record (see below).
+10. **app_settings** — **was NOT in either SQL file.** Live but undocumented.
+    Likely global config (possibly active-event / feature flags — ties to the
+    "global state lives in the DB, not localStorage" principle). Contents TBD.
 
----
-
-## Tables
-
-**courses** — `id`, `name` (unique), `city`, `state`, `par` (default 72),
-`slope_rating`, `course_rating`, `created_at`. Test-event courses imported and
-verified.
-
-**course_holes** — 18 rows per course. `course_id` (FK), `hole_number` (1–18),
-`par`, `handicap_rank` (1–18, per-hole **stroke index**, 1 = hardest), yardages
-per tee. `handicap_rank` is the data **net scoring** needs — it exists. Good.
-
-**events** — single-annual-outing model. `year` is **UNIQUE** (one event per
-year). Per-day course FKs and tee times (fri/sat/sun + AM/PM), `active_round`,
-`status`, `scores_locked`. Legacy `course_id` retained, unused.
-
-**players** — `id`, `name`, `pin` (4-digit, unique), `created_at`.
-**This is the entire identity model. No email, password, auth, account linkage,
-or contact info.** Players identified by 4-digit PIN. Persistent roster.
-
-**event_players** — players in an event. `event_id`, `player_id`, `tee_box`
-(black/blue/white/red), unique `(event_id, player_id)`. Note: a tee concept
-already exists here.
-
-**round_scores** — **the single score of record.** 14 columns:
-`id`, `event_id`, `player_id`, `course_id`, `day` (text), `round_time` (text),
-`is_scramble` (bool), `hole_scores` (jsonb, per-hole detail), `holes_completed`
-(int), `is_complete` (bool), `created_at`, `scramble_team_id`, `total_score`
-(int), `score_vs_par` (int).
-NOTE: `total_score` and `score_vs_par` are **separate first-class columns**
-(not derived only from JSONB) — this **satisfies** the CLAUDE.md principle. The
-`hole_scores` JSONB holds per-hole detail alongside them, which is a fine
-pattern. **Leave this shape as-is in the migration.**
-
-**scramble_teams** — `event_id`, `round`, `team_number`, `player_ids uuid[]`,
-`finishing_positions integer[]`. Unique `(event_id, round, team_number)`.
-
-**event_groups** — teesheet groups for morning rounds. `event_id`, `day`,
-`group_number`.
-
-**group_players** — players in a teesheet group. `group_id`, `player_id`.
-
-**app_settings** — exists live, not in SQL files. Contents to confirm before
-migration (likely config / active-event pointer / flags). Carry over.
+**Resolved (no longer concerns):**
+- `scorecards` — **does not exist.** Already dropped. The v2 migration's
+  commented-out `DROP TABLE scorecards` (or equivalent) was applied. There is
+  **no two-score-table ambiguity** — `round_scores` is the sole score of record.
+- `combined_stroke_totals` view — **not present** in the public table/view list.
+  Either dropped, never created, or in another schema. Confirm during dump; not
+  a blocker.
 
 ---
 
-## Score of record (settled)
+## round_scores — the score of record (VERIFIED, 14 columns)
 
-`round_scores` is the **single** score of record. `scorecards` is dropped and
-gone. Every side-game reader (`docs/side-games.md`) reads from `round_scores`.
-The "one score written once, read many times" principle has one clear home.
+The live table is far richer than the SQL files describe. Confirmed columns:
+
+| Column | Type | Null | Default |
+|---|---|---|---|
+| id | uuid | NO | uuid_generate_v4() |
+| event_id | uuid | YES | |
+| player_id | uuid | YES | |
+| course_id | uuid | YES | |
+| day | text | NO | |
+| round_time | text | NO | |
+| is_scramble | boolean | NO | false |
+| hole_scores | jsonb | YES | '{}' |
+| holes_completed | integer | YES | 0 |
+| is_complete | boolean | YES | false |
+| created_at | timestamptz | YES | now() |
+| scramble_team_id | uuid | YES | |
+| total_score | integer | YES | |
+| score_vs_par | integer | YES | |
+
+**Key findings:**
+- **`score_vs_par` already exists as its own column**, alongside `total_score`
+  and `hole_scores`. The CLAUDE.md principle (hole scores / total / vs-par are
+  separate columns, never one JSONB blob) is **already satisfied here.** The
+  earlier "JSONB violates the principle" concern applied to the old `scorecards`
+  table, which is gone.
+- `hole_scores` (jsonb) coexists with the promoted `total_score` /
+  `score_vs_par` columns. This is a **sound pattern**, not a violation: per-hole
+  detail in JSONB for flexible read, while the two derived values everything
+  queries against are first-class indexed columns. **Leave this shape as-is in
+  the migration.**
+- Scramble support is built in (`is_scramble`, `scramble_team_id`), consistent
+  with the side-games "scramble writes a team score" rule.
 
 ---
 
-## Design-doc gaps (target state the schema lacks — net-new work)
+## Net-scoring dependency status
 
-Not errors — the build gap between current state and launch design.
-
-- **No account/auth layer.** `players` is PIN-only with no email/phone/auth.
-  The login restructure (Supabase Auth: email+password, stay-logged-in, Google
-  sign-in) and the `account-less-players.md` claim model are **net-new**. There
-  is no contact column to build code-to-contact claim verification on yet.
-- **Profile data has no home.** Planned `accounts` table (email, phone, age,
-  gender, location, default tee) does not exist.
-- **Single-event-per-year assumption.** `events.year` UNIQUE; whole model assumes
-  one annual outing. Multi-event / league / casual directions require relaxing
-  this.
-- **No league tables.** Referenced in login/home design; absent from schema.
-- **No side-game tables.** Three-bucket model (incl. `wolf_hole_state`) has no
-  schema yet. All read from `round_scores`.
-- **No stub/claim columns** on `players` (`account_id`, `invite_contact`,
-  `claim_state`, `created_by_account_id`).
-- **Net-scoring dependency partially met:** `course_holes.handicap_rank` exists
-  for imported courses; the 42K bulk import must also carry per-hole stroke index.
+- `course_holes.handicap_rank` (per-hole stroke index) **exists** — the data net
+  scoring needs is present for imported courses. Good.
+- The 42K bulk import must also carry per-hole stroke index for net to work
+  app-wide (see `docs/side-games.md`: net is a fast-follow).
 
 ---
 
-## Migration note (Neon → Supabase)
+## Outstanding verifications
 
-Schema is clean and evolved, not a mess — migrate the live structure **as-is**,
-verify parity, then layer net-new tables (accounts, leagues, side-games) on top.
-Do not combine the migration with a redesign. Confirm `app_settings` contents and
-`scorecards` absence (already confirmed gone) before cutover. See the migration
-runbook.
+- **`app_settings` contents** — columns + row count + what it governs. (Query
+  pending.)
+- **`round_scores` row count** — confirm test-event data is present. (Query
+  pending.)
+- **`combined_stroke_totals` view** — confirm dropped vs. elsewhere, during dump.
+
+---
+
+## Design-doc gaps (target vs. current — not errors, just the build gap)
+
+- **No account/auth layer.** `players` is PIN-only. Supabase Auth + the
+  account/profile model + the `account-less-players.md` claim flow are all
+  **net-new**. (See `docs/auth-login.md` once written.)
+- **Single-event-per-year assumption.** `events.year` is UNIQUE; the model
+  assumes one annual outing. Multi-event / league / casual directions require
+  relaxing this.
+- **No league tables.** Referenced in the home/login design; absent from schema.
+- **No side-game tables.** The three-bucket model (incl. `wolf_hole_state`) has
+  no schema yet.
+- **No stub/claim columns** on `players` (account_id, invite_contact,
+  claim_state, etc.).
+- **Score of record is SETTLED:** `round_scores`, single table, already has
+  `score_vs_par`. This gap is now CLOSED — side-game readers have a clean,
+  unambiguous source.
+
+---
+
+## Migration context (Neon → Supabase)
+
+Decision: migrate data Neon → Supabase now (dataset is at minimum size; beta
+group inactive; no live traffic to disrupt). The schema turned out **clean and
+evolved**, not messy — the "contradictions" were all documentation drift. Plan:
+migrate the live structure **as-is**, archive/skip the already-dropped
+`scorecards`, verify parity, then layer auth. Do not combine migration with
+redesign. See `docs/migration-runbook.md`.
