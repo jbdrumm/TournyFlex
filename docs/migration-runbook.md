@@ -1,5 +1,32 @@
 # Neon -> Supabase Migration Runbook
 
+## QUICK STATUS & NEXT-STEPS CHECKLIST (top-of-file reference)
+
+Done:
+- [x] Neon: pg_dump complete (artifact in hand; 10 tables, no views, 487 round_scores)
+- [x] Supabase: dedicated account + project created (Postgres DEFAULT; auto-RLS ON; expose-new-tables OFF)
+- [x] GitHub: TournyFlex org created; repo at github.com/TournyFlex/TournyFlex
+- [x] Netlify: GitHub App installed on org, scoped to the TournyFlex repo only
+- [x] Google Workspace: admin@tournyflex.com verified; mail routing live
+- [x] Domain: tournyflex.com (Porkbun) — privacy + auto-renew + lock + 2FA
+
+Next, IN THIS ORDER (order matters — do not reorder 1->2):
+- [ ] 1. Enable extension FIRST: `create extension if not exists "uuid-ossp";`
+        (Supabase SQL editor) — restore FAILS without it (uuid_generate_v4 defaults)
+- [ ] 2. Restore the dump: `pg_restore` the .bak into Supabase
+- [ ] 3. GATE 2 — verify row counts vs Neon (487 round_scores, 2 app_settings, etc.)
+- [ ] 4. GATE 2-bis — enable RLS on ALL 10 migrated tables (see 2d-bis)
+- [ ] 5. Cutover — update Netlify DB connection-string env var: Neon -> Supabase
+- [ ] 6. GATE 3 — test a READ and a WRITE path against Supabase
+- [ ] 7. Keep Neon intact as rollback until app is stable on Supabase
+- [ ] 8. Rotate GitHub token: new one with TournyFlex ORG access + `workflow`
+        scope; revoke the old token; hand the new token to Claude
+- [ ] 9. Confirm NEON_DATABASE_URL secret survived the org transfer
+        (org repo -> Settings -> Secrets); re-add if missing
+
+---
+
+
 Status: **active plan.** Two phases. Phase 1 (dump) is automated via GitHub
 Actions and touches nothing but Neon. Phase 2 (load) is a deliberate, reviewed
 step into a fresh Supabase project. Do NOT combine migration with redesign —
