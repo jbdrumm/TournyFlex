@@ -1,0 +1,52 @@
+name: Neon DB Dump
+
+on:
+  workflow_dispatch:   # manual trigger only — never automatic
+
+jobs:
+  dump:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install PostgreSQL 17 client
+        run: |
+          sudo sh -c 'echo "deb https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/postgresql.gpg
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client-17
+
+      - name: Verify pg_dump is v17
+        run: /usr/lib/postgresql/17/bin/pg_dump --version
+
+      - name: Dump (custom format .bak — the artifact to restore from)
+        env:
+          PGURL: ${{ secrets.NEON_DATABASE_URL }}
+        run: |
+          /usr/lib/postgresql/17/bin/pg_dump -Fc -v \
+            --no-owner --no-privileges --no-acl \
+            -d "$PGURL" -f tournyflex_neon.bak
+
+      - name: Dump (plain .sql — human-readable, for inspection only)
+        env:
+          PGURL: ${{ secrets.NEON_DATABASE_URL }}
+        run: |
+          /usr/lib/postgresql/17/bin/pg_dump -v \
+            --no-owner --no-privileges --no-acl \
+            -d "$PGURL" -f tournyflex_neon_dump.sql
+
+      - name: Sanity check — list tables found in the dump
+        run: |
+          echo "=== CREATE TABLE count (expect 10) ==="
+          grep -c "CREATE TABLE" tournyflex_neon_dump.sql || true
+          echo "=== tables ==="
+          grep "CREATE TABLE" tournyflex_neon_dump.sql || true
+          echo "=== views ==="
+          grep "CREATE VIEW\|CREATE MATERIALIZED VIEW" tournyflex_neon_dump.sql || echo "(no views)"
+
+      - name: Upload dump artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: neon-dump
+          path: |
+            tournyflex_neon.bak
+            tournyflex_neon_dump.sql
+          retention-days: 7
