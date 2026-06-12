@@ -13,9 +13,9 @@ Done:
 Next, IN THIS ORDER (order matters — do not reorder 1->2):
 - [x] 1. Enable extension: `create extension if not exists "uuid-ossp";` — DONE
         (Supabase SQL editor) — restore FAILS without it (uuid_generate_v4 defaults)
-- [ ] 2. Restore the dump: `pg_restore` the .bak into Supabase
-- [ ] 3. GATE 2 — verify row counts vs Neon (487 round_scores, 2 app_settings, etc.)
-- [ ] 4. GATE 2-bis — enable RLS on ALL 10 migrated tables (see 2d-bis)
+- [x] 2. Restore DONE — all 10 tables created clean
+- [x] 3. GATE 2 PASSED — round_scores 487, app_settings 2, players 26, courses 12, course_holes 180, events 7; round_scores 14 cols incl score_vs_par
+- [x] 4. GATE 2-bis PASSED — RLS enabled on all 10 (rowsecurity=t). Note: Neon's existing permissive policies (Public read / Anon insert/update/delete) also restored.
 - [ ] 5. Cutover — update Netlify DB connection-string env var: Neon -> Supabase
 - [ ] 6. GATE 3 — test a READ and a WRITE path against Supabase
 - [ ] 7. Keep Neon intact as rollback until app is stable on Supabase
@@ -27,7 +27,46 @@ Next, IN THIS ORDER (order matters — do not reorder 1->2):
 ---
 
 
-Status: **active plan.** Two phases. Phase 1 (dump) is automated via GitHub
+---
+
+## MIGRATION COMPLETE (data) — lessons recorded
+
+The Neon -> Supabase data migration succeeded via the
+`.github/workflows/neon-to-supabase.yml` Action. Final verified state in Supabase:
+10 tables; round_scores 487, app_settings 2, players 26, courses 12,
+course_holes 180, events 7; round_scores has all 14 columns incl score_vs_par;
+RLS enabled on all 10.
+
+**Hard-won lesson — the uuid-ossp schema trap (cost two failed runs):**
+The Neon dump calls `public.uuid_generate_v4()` (schema-qualified to `public`).
+A plain `create extension "uuid-ossp";` on Supabase installs it into the
+`extensions` schema, NOT `public`, so `public.uuid_generate_v4()` does not
+resolve and EVERY table create fails (only app_settings, which has no uuid
+default, survives). Also: `drop schema public cascade` does NOT drop the
+extension because it lives in `extensions`, and a re-`create extension` then
+errors "already exists".
+
+Correct pre-restore reset (run in Supabase SQL editor):
+```sql
+drop extension if exists "uuid-ossp";
+drop schema if exists public cascade;
+create schema public;
+grant all on schema public to postgres, anon, authenticated, service_role;
+create extension "uuid-ossp" with schema public;
+select public.uuid_generate_v4();  -- must return a UUID before restoring
+```
+Future cleanup option: switch uuid defaults to core `gen_random_uuid()` (no
+extension needed) so this can't recur.
+
+**Note on restored RLS policies:** the tables arrived with Neon's permissive
+policies (`USING (true)` — fully open to anon). That is correct for migration
+parity but is NOT secure for launch. These policies must be TIGHTENED when the
+real auth/account layer is built (see docs/auth-login.md). "RLS enabled" here
+means structurally on, not access-restricted.
+
+---
+
+Status: **Phase 2 data migration COMPLETE.** Two phases. Phase 1 (dump) is automated via GitHub
 Actions and touches nothing but Neon. Phase 2 (load) is a deliberate, reviewed
 step into a fresh Supabase project. Do NOT combine migration with redesign —
 move the schema AS-IS, verify parity, then refactor later.
