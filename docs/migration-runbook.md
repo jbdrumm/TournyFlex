@@ -10,6 +10,18 @@ minimum size, is the low-risk moment). Verified schema: 10 tables, round_scores
 is the single score of record (487 rows), scorecards already dropped. See
 `docs/schema-current.md`.
 
+**RLS posture (IMPORTANT):** the new Supabase project was created with
+**automatic RLS ENABLED** — every NEW table gets Row Level Security on by
+default (locked until a policy is written). This is the secure-by-default choice
+and is deliberate (the app will store real user PII: emails, phones, scores).
+Consequence to remember: a table with RLS on and NO policy blocks ALL access via
+the Data API / anon+authenticated roles. The Netlify functions (direct/service
+connection) bypass RLS, so app behavior keeps working — but nothing is reachable
+through the public API until policies exist. The **migrated tables come in
+WITHOUT RLS/policies and must have their RLS posture set explicitly after the
+restore** (see step 2d-bis below). Do this before launch for anything
+user-facing.
+
 ---
 
 ## Phase 1 — Dump Neon to an artifact (automated, no local install)
@@ -45,6 +57,13 @@ runner. Nothing installs on your PC.
 ### 2a. Create the destination
 - Create a new Supabase project (this becomes the auth + data home).
 - Choose the **same Postgres major version (17)** if offered, or newer.
+- **Postgres type: standard Postgres (DEFAULT), NOT OrioleDB** (OrioleDB is
+  alpha / not for production; this choice is irreversible after creation).
+- **Project security settings chosen at creation:**
+  - Data API: ON
+  - Automatically expose new tables: OFF (expose tables manually — safer with PII)
+  - **Automatic RLS: ON** (Row Level Security auto-enabled on new tables —
+    secure-by-default; every new table is locked until a policy is written).
 - Note: free tier caps at 2 active projects and pauses after ~1 week idle —
   a user-facing DB should be on **Pro ($25/mo)** so it never pauses. (Auth MAUs
   are free well past our ~12K ceiling; the $25 is for the always-on project.)
@@ -89,6 +108,24 @@ select column_name from information_schema.columns
 ```
 
 **GATE 2:** Row counts and column shape must match Neon exactly before cutover.
+
+### 2d-bis. RLS on the MIGRATED tables (REQUIRED — do not skip)
+Automatic RLS (enabled at project creation) applies to NEW tables. The 10 tables
+brought in by `pg_restore` arrive WITHOUT RLS enabled and WITHOUT policies. They
+must be handled deliberately:
+- The Netlify functions connect via the direct/service connection, which
+  BYPASSES RLS — so the app keeps working after restore even before policies
+  exist. Do not mistake "app still works" for "tables are secured."
+- For each migrated table, decide and apply RLS posture BEFORE launch:
+  1. `alter table <t> enable row level security;`
+  2. Write policies appropriate to the table (e.g. a player can read their own
+     scores; commissioner visibility per the default-closed rules in CLAUDE.md).
+  3. Tables with PII (players + the future accounts/profile tables) are the
+     priority — never leave these readable through the Data API without policy.
+- Until policies exist, keep "expose new tables" OFF so the Data API does not
+  surface a table publicly by accident.
+- This is a launch-blocking checklist item for any user-facing table, NOT
+  optional cleanup.
 
 ### 2e. Repoint the app
 - Update the Netlify serverless functions' DB connection string (env var) from
