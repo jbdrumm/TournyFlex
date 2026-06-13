@@ -68,6 +68,18 @@ and the casual side-game segment at the same time. Protect that overlap.
   from Neon arrive without RLS; enable + policy them before launch (see
   `docs/migration-runbook.md` step 2d-bis). The Netlify service connection
   bypasses RLS, so "the app works" does NOT mean a table is secured.
+- **DEV vs PROD database — be deliberate which one tools point at.** The app AND
+  the coming-soon splash site share the **same Supabase project**. Production data
+  (and the live founding-tester waitlist) lives there. Do NOT run migrations,
+  destructive SQL, or test writes against production from a dev session or from an
+  AI agent. Use a Supabase dev branch / separate dev database, or be explicit and
+  careful with which `DATABASE_URL` is active. A wrong `DATABASE_URL` is how you
+  silently corrupt or wipe real data.
+- **AI agents (Claude Code, etc.) start with NO context from past chat sessions.**
+  They only know what's committed to this repo (this file especially). Decisions
+  made in chat that aren't written here are invisible to them. Keep CLAUDE.md and
+  `docs/` current as the single source of truth. Do not assume an agent "remembers"
+  prior work — if it matters, it must be in the repo.
 
 ---
 
