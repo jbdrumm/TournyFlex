@@ -57,6 +57,18 @@ and the casual side-game segment at the same time. Protect that overlap.
 - Commissioner visibility into private group side games: **default closed.**
 - Friend privacy: **default `shared_only`**, opt-in to `full`.
 
+### Database security (Supabase)
+- **Row Level Security (RLS) is ON by default** for new tables (set at project
+  creation). Every new table is locked until an explicit policy is written —
+  secure-by-default. Do not disable.
+- **"Automatically expose new tables" is OFF.** Tables are exposed through the
+  Data API manually/deliberately, never by default. Especially never auto-expose
+  PII tables (players, accounts/profile).
+- **Migrated tables need RLS applied post-restore.** The 10 tables brought over
+  from Neon arrive without RLS; enable + policy them before launch (see
+  `docs/migration-runbook.md` step 2d-bis). The Netlify service connection
+  bypasses RLS, so "the app works" does NOT mean a table is secured.
+
 ---
 
 ## Architecture principles
@@ -139,6 +151,15 @@ navigation.
 Login screen is currently **stubbed** in `SplashScreen.jsx` and `App.jsx`. The
 multi-tournament login screen was previously deferred — confirm whether this
 build is the full multi-event selector or single-event entry for launch.
+
+**Accounts table — required fields when built (NOT YET CREATED).** There is no
+account/auth table yet (identity is PIN-only today; see schema-current.md). When
+the account/profile schema is built, it MUST include **birthdate** (precise date,
+not an age bucket). Birthdate is needed for: TournyFlex Index/handicap context,
+age-eligibility for outings, and league age rules. Note the distinction from the
+coming-soon waitlist, which collects a coarse **age range** for demographics only
+— the real account needs an actual birthdate. Collect birthdate at account
+signup.
 
 ### 2. Side-game data model
 
