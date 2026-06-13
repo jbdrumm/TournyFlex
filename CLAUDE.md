@@ -161,6 +161,22 @@ coming-soon waitlist, which collects a coarse **age range** for demographics onl
 — the real account needs an actual birthdate. Collect birthdate at account
 signup.
 
+**Founding-tester credits system (NOT YET BUILT — marketing promise made on the
+coming-soon site).** The founding-tester offer creates a future billing
+obligation that the accounts/billing system must honor. Mechanics as promised:
+- Founding testers (the 50 from the coming-soon site) earn **1 free-month credit
+  per round of feedback** given during the 2026 founding season.
+- Feedback rounds may be **real OR simulator rounds** (sim rounds earn credits and
+  are tracked separately; sim rounds are NOT real-round / index-eligible).
+- Credits cap at **12** (a full free year).
+- Credits are **redeemable only against individual play.** They explicitly DO NOT
+  apply to outing, event, or league entry fees.
+- Credits are applied **by the user** in account settings (a "credits" section:
+  balance, apply-to-month, expiry).
+- **All credits expire Dec 31, 2027.**
+This requires, when accounts/billing are built: a credits ledger per user, a
+notion of credit-eligible charge types (individual play only), and an expiry.
+
 ### 2. Side-game data model
 
 Designed (plan only, no code yet):
