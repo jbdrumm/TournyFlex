@@ -20,7 +20,7 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true)
   const [showSponsor, setShowSponsor] = useState(true)  // loaded from DB
   const [dbError, setDbError] = useState(null)
-  const { player, isCommissioner, signOutPlayer } = useAuth()
+  const { player, isCommissioner, signOutAccount } = useAuth()
   const { theme, toggle } = useTheme()
   const navigate = useNavigate()
 
@@ -192,7 +192,7 @@ export default function HomePage() {
             {/* Sign out — bottom of page, above commissioner login */}
             {player && (
               <div style={{ textAlign: 'center', marginTop: 16 }}>
-                <button className="btn btn-ghost btn-sm" onClick={signOutPlayer}>Sign Out</button>
+                <button className="btn btn-ghost btn-sm" onClick={signOutAccount}>Sign Out</button>
               </div>
             )}
 

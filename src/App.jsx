@@ -12,15 +12,23 @@ import HistoryPage from './pages/HistoryPage'
 import CommissionerPage from './pages/CommissionerPage'
 import LoginPage from './pages/LoginPage'
 import PlayerLoginPage from './pages/PlayerLoginPage'
+import SignupPage from './pages/SignupPage'
+
+// Pre-app flow: splash → install → auth gate → app
+//
+// Auth gate (after install is dismissed):
+//   - isCommissioner OR (session + completed player) → app routes
+//   - session, no player or incomplete                → SignupPage
+//   - no session and not commissioner                 → PlayerLoginPage
+//
+// /login (commissioner PIN) is still a normal route so it's reachable from
+// the PlayerLoginPage "Commissioner sign in" link.
 
 export default function App() {
-  const { loading } = useAuth()
+  const { loading, isCommissioner, session, isSignedUp } = useAuth()
 
-  // Pre-app flow stages: 'splash' → 'install' → 'app'
-  // FUTURE LOGIN HOOK: add 'login' stage between 'install' and 'app'
   const [stage, setStage] = useState('splash')
 
-  // Capture Android's deferred install prompt as early as possible
   useEffect(() => {
     const handler = (e) => {
       e.preventDefault()
@@ -30,26 +38,45 @@ export default function App() {
     return () => window.removeEventListener('beforeinstallprompt', handler)
   }, [])
 
+  // Splash
+  if (stage === 'splash') {
+    return (
+      <SplashScreen
+        ready={!loading}
+        onDone={() => setStage('install')}
+      />
+    )
+  }
+
+  // Install prompt (self-skips if not needed)
+  if (stage === 'install') {
+    return (
+      <InstallPrompt
+        visible={true}
+        onDone={() => setStage('app')}
+      />
+    )
+  }
+
+  // Stage = 'app' — apply auth gate
+  const isAuthed = isCommissioner || (session && isSignedUp)
+
+  if (!isAuthed && session && !isSignedUp) {
+    return <SignupPage />
+  }
+
+  if (!isAuthed) {
+    return (
+      <Routes>
+        {/* Commissioner PIN page is reachable from the player login screen */}
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="*" element={<PlayerLoginPage />} />
+      </Routes>
+    )
+  }
+
   return (
     <>
-      {/* Stage 1: Splash */}
-      {stage === 'splash' && (
-        <SplashScreen
-          ready={!loading}
-          onDone={() => setStage('install')}
-        />
-      )}
-
-      {/* Stage 2: Install prompt (skips itself if not needed) */}
-      {stage === 'install' && (
-        <InstallPrompt
-          visible={true}
-          onDone={() => setStage('app')}
-        />
-      )}
-
-      {/* Stage 3: App
-          FUTURE LOGIN HOOK: wrap routes in a login gate here */}
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/leaderboard" element={<LeaderboardPage />} />
@@ -58,7 +85,7 @@ export default function App() {
         <Route path="/history" element={<HistoryPage />} />
         <Route path="/commissioner" element={<CommissionerPage />} />
         <Route path="/login" element={<LoginPage />} />
-        <Route path="/player-login" element={<PlayerLoginPage />} />
+        <Route path="/player-login" element={<Navigate to="/" replace />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       <BottomNav />
